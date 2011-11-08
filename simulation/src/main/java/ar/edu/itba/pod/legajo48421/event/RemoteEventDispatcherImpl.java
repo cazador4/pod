@@ -1,6 +1,9 @@
 package ar.edu.itba.pod.legajo48421.event;
 
+import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -8,24 +11,66 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import ar.edu.itba.event.EventInformation;
 import ar.edu.itba.event.RemoteEventDispatcher;
+import ar.edu.itba.node.Node;
 import ar.edu.itba.node.NodeInformation;
+import ar.edu.itba.node.api.ClusterAdministration;
 import ar.edu.itba.pod.agent.runner.Agent;
 
 public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 
+
+	private final BlockingQueue<Object> queue;
+	private final NodeInformation node;
+	private final BlockingQueue<Object> processingQueue;
 	
-	private BlockingQueue<Object> queue;
-	
-	public RemoteEventDispatcherImpl(){
-		queue = new LinkedBlockingQueue<Object>();
+
+	public RemoteEventDispatcherImpl(final NodeInformation node){
+		this.queue = new LinkedBlockingQueue<Object>();
+		this.node = node;
+		this.processingQueue = new LinkedBlockingQueue<Object>();
+		Thread thread = new Thread(){
+			@Override
+			public void run() {
+				while(true){
+					Object event = queue.poll();
+					if(event!=null){
+						try {
+							processingQueue.add((EventInformation)event);
+							Registry registry = LocateRegistry.getRegistry(node.host(), node.port());
+							ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
+							for(NodeInformation connectedNode : cluster.connectedNodes()){
+								Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
+								RemoteEventDispatcher remoteEventDispatcher = (RemoteEventDispatcher)connectedRegistry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
+								remoteEventDispatcher.publish((EventInformation)event);
+							}
+							
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						} catch (RemoteException e) {
+							e.printStackTrace();
+						} catch (NotBoundException e) {
+							e.printStackTrace();
+						}
+					}
+					try {
+						Thread.sleep(10000);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+		};
+		thread.start();
 	}
-	
+
 	@Override
 	public boolean publish(EventInformation event) throws RemoteException,
-			InterruptedException {
-		boolean result = findInQueue(event.nodeId()).isEmpty();
-		queue.add(event);
-		return result;
+	InterruptedException {
+		if(!queue.contains(event) && !processingQueue.contains(event)){
+			queue.add(event);
+			return true;
+		}
+		return false;
 	}
 
 	private Set<EventInformation> findInQueue(String nodeId) {
@@ -41,14 +86,12 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 	@Override
 	public Set<EventInformation> newEventsFor(NodeInformation nodeInformation)
 			throws RemoteException {
-		
 		return findInQueue(nodeInformation.id());
 	}
 
 	@Override
 	public BlockingQueue<Object> moveQueueFor(Agent agent)
 			throws RemoteException {
-		// TODO Auto-generated method stub
 		return null;
 	}
 
