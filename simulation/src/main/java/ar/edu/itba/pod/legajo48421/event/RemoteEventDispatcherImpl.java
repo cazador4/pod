@@ -22,30 +22,34 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 	private final BlockingQueue<Object> queue;
 	private final NodeInformation node;
 	private final BlockingQueue<Object> processingQueue;
-	
+
 
 	public RemoteEventDispatcherImpl(final NodeInformation node){
 		this.queue = new LinkedBlockingQueue<Object>();
 		this.node = node;
 		this.processingQueue = new LinkedBlockingQueue<Object>();
-		Thread thread = new Thread(){
+		Thread getQueueEvent = new Thread(){
 			@Override
 			public void run() {
 				while(true){
 					Object event = queue.poll();
 					if(event!=null){
 						try {
+							System.out.println(event);
+							((EventInformation)event).setReceivedTime(System.currentTimeMillis());
 							processingQueue.add((EventInformation)event);
 							Registry registry = LocateRegistry.getRegistry(node.host(), node.port());
 							ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
 							for(NodeInformation connectedNode : cluster.connectedNodes()){
-								Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
-								RemoteEventDispatcher remoteEventDispatcher = (RemoteEventDispatcher)connectedRegistry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
-								remoteEventDispatcher.publish((EventInformation)event);
+								if(!connectedNode.equals(node)){
+									Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
+									//RemoteEventDispatcher remoteEventDispatcher = (RemoteEventDispatcher)connectedRegistry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
+									//remoteEventDispatcher.publish((EventInformation)event);
+								}
 							}
-							
-						} catch (InterruptedException e) {
-							e.printStackTrace();
+
+							//} catch (InterruptedException e) {
+							//	e.printStackTrace();
 						} catch (RemoteException e) {
 							e.printStackTrace();
 						} catch (NotBoundException e) {
@@ -53,14 +57,35 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 						}
 					}
 					try {
-						Thread.sleep(10000);
+						Thread.sleep(3000);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
 				}
 			}
 		};
-		thread.start();
+		getQueueEvent.start();
+
+		Thread getNewEvent = new Thread(){
+			@Override
+			public void run() {
+				Registry registry;
+				try {
+					registry = LocateRegistry.getRegistry(node.host(), node.port());
+					ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
+					for(NodeInformation connectedNode : cluster.connectedNodes()){
+						registry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
+						//RemoteEventDispatcher connectedEventDispatcher = (RemoteEventDispatcher)registry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
+						//queue.addAll(connectedEventDispatcher.newEventsFor(node));
+					}
+				} catch (RemoteException e) {
+					e.printStackTrace();
+				} catch (NotBoundException e) {
+					e.printStackTrace();
+				}
+			}
+		};
+		getNewEvent.start();
 	}
 
 	@Override

@@ -10,9 +10,15 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.Set;
 
+import org.joda.time.Duration;
+
+import ar.edu.itba.balance.api.NodeAgent;
+import ar.edu.itba.event.EventInformation;
 import ar.edu.itba.node.Node;
 import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.ClusterAdministration;
+import ar.edu.itba.pod.agent.market.Producer;
+import ar.edu.itba.pod.agent.market.Resource;
 
 public class Main {
 	//Main Server
@@ -39,6 +45,9 @@ public class Main {
 							System.exit(0);
 							break;
 						case newevent:
+							Resource resource = new Resource("Alloy", "Steel");
+							NodeAgent nodeAgent = new NodeAgent(host.getNodeInformation(), new Producer("steel mine" + 1, resource, Duration.standardDays(1), 5));
+							host.getRemoteEventDispatcher().publish(new EventInformation("New Agent", host.getNodeInformation().id() + System.currentTimeMillis(), nodeAgent.agent()));
 							break;
 						case events:
 							break;
@@ -97,6 +106,10 @@ public class Main {
 								System.exit(0);
 								break;
 							case newevent:
+								Resource resource = new Resource("Alloy", "Steel");
+								NodeAgent nodeAgent = new NodeAgent(host.getNodeInformation(), new Producer("steel mine" + 1, resource, Duration.standardDays(1), 5));
+								host.getRemoteEventDispatcher().publish(new EventInformation("New Agent", host.getNodeInformation().id(), nodeAgent.agent()));
+								
 								/*System.out.println("steel - copper - gold");
 									BufferedReader br2 = new BufferedReader(new InputStreamReader(System.in));
 									String resourceString = br2.readLine();
@@ -136,6 +149,8 @@ public class Main {
 								break;
 							}
 						} catch (IOException e) {
+							e.printStackTrace();
+						} catch (InterruptedException e) {
 							e.printStackTrace();
 						}
 					}

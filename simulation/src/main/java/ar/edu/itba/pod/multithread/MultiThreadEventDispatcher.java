@@ -69,7 +69,6 @@ public class MultiThreadEventDispatcher implements EventDispatcher {
 	@Override
 	public void publish(Agent source, Serializable event) throws InterruptedException {
 		String target = (event instanceof TargetedEvent) ? ((TargetedEvent)event).target() : null;
-
 		Set<Agent> agents = listeners.get(event.getClass());
 		for (Agent agent : agents) {
 			if (target == null || target.equals(agent.name())) {

@@ -6,24 +6,29 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 
-import com.google.common.base.Preconditions;
-
+import ar.edu.itba.event.RemoteEventDispatcher;
 import ar.edu.itba.node.Node;
 import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.ClusterAdministration;
+import ar.edu.itba.pod.legajo48421.event.RemoteEventDispatcherImpl;
+
+import com.google.common.base.Preconditions;
 
 public class Host {
 
 	private ClusterAdministration cluster;
 	private NodeInformation node;
 	private Registry registry;
+	private RemoteEventDispatcher remoteEventDispatcher;
 	//private ClusterAdministration connectedCluster;
 	
 	public Host(String host, int port, String id) throws RemoteException, AlreadyBoundException {
 		node = new NodeInformation(host, port, id);
 		cluster = new ClusterAdministrationImpl(node);
+		remoteEventDispatcher = new RemoteEventDispatcherImpl(node); 
 		registry = LocateRegistry.createRegistry(port);
 		registry.bind(Node.CLUSTER_COMUNICATION, cluster);
+		registry.bind(Node.DISTRIBUTED_EVENT_DISPATCHER, remoteEventDispatcher);
 	}
 	
 	public void connect(String host, int port) throws RemoteException, NotBoundException{
@@ -40,5 +45,9 @@ public class Host {
 	public NodeInformation getNodeInformation(){
 		Preconditions.checkNotNull(node, "Node Information must not be null");
 		return node;
+	}
+	
+	public RemoteEventDispatcher getRemoteEventDispatcher(){
+		return remoteEventDispatcher;
 	}
 }
