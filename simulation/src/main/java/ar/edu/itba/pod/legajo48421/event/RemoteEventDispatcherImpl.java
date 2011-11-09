@@ -28,6 +28,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 		this.queue = new LinkedBlockingQueue<Object>();
 		this.node = node;
 		this.processingQueue = new LinkedBlockingQueue<Object>();
+		UnicastRemoteObject.exportObject(this, 0);
 		Thread getQueueEvent = new Thread(){
 			@Override
 			public void run() {
@@ -43,8 +44,8 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 							for(NodeInformation connectedNode : cluster.connectedNodes()){
 								if(!connectedNode.equals(node)){
 									Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
-									//RemoteEventDispatcher remoteEventDispatcher = (RemoteEventDispatcher)connectedRegistry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
-									//remoteEventDispatcher.publish((EventInformation)event);
+									RemoteEventDispatcher remoteEventDispatcher = (RemoteEventDispatcher)connectedRegistry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
+									remoteEventDispatcher.publish((EventInformation)event);
 								}
 							}
 
@@ -75,8 +76,8 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 					ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
 					for(NodeInformation connectedNode : cluster.connectedNodes()){
 						registry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
-						//RemoteEventDispatcher connectedEventDispatcher = (RemoteEventDispatcher)registry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
-						//queue.addAll(connectedEventDispatcher.newEventsFor(node));
+						RemoteEventDispatcher connectedEventDispatcher = (RemoteEventDispatcher)registry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
+						queue.addAll(connectedEventDispatcher.newEventsFor(node));
 					}
 				} catch (RemoteException e) {
 					e.printStackTrace();
