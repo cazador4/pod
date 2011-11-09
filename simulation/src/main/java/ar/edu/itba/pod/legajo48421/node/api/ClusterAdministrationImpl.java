@@ -64,13 +64,13 @@ public class ClusterAdministrationImpl implements ClusterAdministration{
 		Preconditions.checkNotNull(group,"Group not exist");
 		if(connectedNodes.contains(node)){
 			connectedNodes.remove(node);
-			/*for(NodeInformation connectedNode : connectedNodes){
+			for(NodeInformation connectedNode : connectedNodes){
 				if(!connectedNode.equals(this.node)){
 					Registry registry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
 					ClusterAdministration connectedCluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
 					connectedCluster.disconnectFromGroup(node);
 				}
-			}*/
+			}
 		}
 
 	}
