@@ -34,32 +34,26 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 			public void run() {
 				while(true){
 					Object event = queue.poll();
-					if(event!=null){
-						try {
-							System.out.println(event);
-							((EventInformation)event).setReceivedTime(System.currentTimeMillis());
-							processingQueue.add((EventInformation)event);
-							Registry registry = LocateRegistry.getRegistry(node.host(), node.port());
-							ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
-							for(NodeInformation connectedNode : cluster.connectedNodes()){
-								if(!connectedNode.equals(node)){
-									Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
-									RemoteEventDispatcher remoteEventDispatcher = (RemoteEventDispatcher)connectedRegistry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
-									remoteEventDispatcher.publish((EventInformation)event);
-								}
-							}
-
-							//} catch (InterruptedException e) {
-							//	e.printStackTrace();
-						} catch (RemoteException e) {
-							e.printStackTrace();
-						} catch (NotBoundException e) {
-							e.printStackTrace();
-						}
-					}
 					try {
-						Thread.sleep(3000);
-					} catch (InterruptedException e) {
+						System.out.println(event);
+						((EventInformation)event).setReceivedTime(System.currentTimeMillis());
+						processingQueue.add((EventInformation)event);
+						Registry registry = LocateRegistry.getRegistry(node.host(), node.port());
+						ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
+						//TODO ver cuantos false recibo del publish para no seguir mandando!
+						for(NodeInformation connectedNode : cluster.connectedNodes()){
+							if(!connectedNode.equals(node)){
+								Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
+								RemoteEventDispatcher remoteEventDispatcher = (RemoteEventDispatcher)connectedRegistry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
+								remoteEventDispatcher.publish((EventInformation)event);
+							}
+						}
+	
+						//} catch (InterruptedException e) {
+						//	e.printStackTrace();
+					} catch (RemoteException e) {
+						e.printStackTrace();
+					} catch (NotBoundException e) {
 						e.printStackTrace();
 					}
 				}
