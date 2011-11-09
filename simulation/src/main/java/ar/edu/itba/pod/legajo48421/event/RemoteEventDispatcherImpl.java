@@ -8,6 +8,8 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import ar.edu.itba.event.EventInformation;
@@ -23,13 +25,16 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 
 	private final BlockingQueue<Object> queue;
 	private final NodeInformation node;
-	private final BlockingQueue<Object> processingQueue;
+	ConcurrentMap<EventInformation, Long> processingEvents;
+	  
 
 
 	public RemoteEventDispatcherImpl(final NodeInformation node){
+		
 		this.queue = new LinkedBlockingQueue<Object>();
 		this.node = node;
-		this.processingQueue = new LinkedBlockingQueue<Object>();
+		processingEvents = new ConcurrentHashMap<EventInformation, Long>(); 
+	
 		try {
 			UnicastRemoteObject.exportObject(this, 0);
 		} catch (RemoteException e1) {
@@ -42,10 +47,9 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 					Object event;
 					try {
 						event = queue.take();
-						if(!processingQueue.contains(event) && !queue.contains(event)){
+						if(!processingEvents.containsKey(event) && !queue.contains(event)){
 							System.out.println(event);
-							//((EventInformation)event).setReceivedTime(System.currentTimeMillis());
-							processingQueue.add((EventInformation)event);
+							processingEvents.put((EventInformation)event, System.currentTimeMillis());
 							Registry registry = LocateRegistry.getRegistry(node.host(), node.port());
 							ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
 							int countFalse = 0;
@@ -110,7 +114,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 	@Override
 	public boolean publish(EventInformation event) throws RemoteException,
 	InterruptedException {
-		if(!queue.contains(event) && !processingQueue.contains(event)){
+		if(!queue.contains(event) && !processingEvents.containsKey(event)){
 			queue.add(event);
 			return true;
 		}

@@ -108,7 +108,9 @@ public class Main {
 							case newevent:
 								Resource resource = new Resource("Alloy", "Steel");
 								NodeAgent nodeAgent = new NodeAgent(host.getNodeInformation(), new Producer("steel mine" + 1, resource, Duration.standardDays(1), 5));
-								host.getRemoteEventDispatcher().publish(new EventInformation("New Agent", host.getNodeInformation().id(), nodeAgent.agent()));
+								EventInformation event = new EventInformation("New Agent", host.getNodeInformation().id(), nodeAgent.agent());
+								event.setReceivedTime(System.currentTimeMillis());
+								host.getRemoteEventDispatcher().publish(event);
 								
 								/*System.out.println("steel - copper - gold");
 									BufferedReader br2 = new BufferedReader(new InputStreamReader(System.in));

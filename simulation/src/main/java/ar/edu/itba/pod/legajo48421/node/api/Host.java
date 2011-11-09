@@ -5,6 +5,8 @@ import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.util.HashSet;
+import java.util.Set;
 
 import ar.edu.itba.event.RemoteEventDispatcher;
 import ar.edu.itba.node.Node;
@@ -31,27 +33,38 @@ public class Host {
 		registry.bind(Node.DISTRIBUTED_EVENT_DISPATCHER, remoteEventDispatcher);
 		Thread checkConnectedNodes = new Thread(){
 			public void run() {
-				try {
-					Thread.sleep(1000);
+				while(true){
 					try {
-						for(NodeInformation connectedNode : cluster.connectedNodes()){
-							try {
-								Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
-							} catch (RemoteException e) {
-								System.out.println("Node falling down!");
+
+						Thread.sleep(1000);
+						try {
+							Set<NodeInformation> offlineNodes = new HashSet<NodeInformation>();
+							for(NodeInformation connectedNode : cluster.connectedNodes()){
 								try {
-									cluster.disconnectFromGroup(connectedNode);
+									Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
+									connectedRegistry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
+								} catch (RemoteException e) {
+									System.out.println("Node falling down!");
+									offlineNodes.add(connectedNode);
+								} catch (NotBoundException e) {
+									offlineNodes.add(connectedNode);
+								}
+							}
+							for(NodeInformation node : offlineNodes)
+							{
+								try {
+									cluster.disconnectFromGroup(node);
 								} catch (NotBoundException e1) {
 									e1.printStackTrace();
 								}
 							}
+
+						} catch (RemoteException e) {
+							e.printStackTrace();
 						}
-						
-					} catch (RemoteException e) {
+					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
-				} catch (InterruptedException e) {
-					e.printStackTrace();
 				}
 			}
 		};
