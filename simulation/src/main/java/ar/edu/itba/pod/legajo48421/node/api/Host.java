@@ -8,10 +8,12 @@ import java.rmi.registry.Registry;
 import java.util.HashSet;
 import java.util.Set;
 
+import ar.edu.itba.balance.api.AgentsBalancer;
 import ar.edu.itba.event.RemoteEventDispatcher;
 import ar.edu.itba.node.Node;
 import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.ClusterAdministration;
+import ar.edu.itba.pod.legajo48421.balance.api.AgentsBalancerImpl;
 import ar.edu.itba.pod.legajo48421.event.RemoteEventDispatcherImpl;
 
 import com.google.common.base.Preconditions;
@@ -22,15 +24,19 @@ public class Host {
 	private NodeInformation node;
 	private Registry registry;
 	private RemoteEventDispatcher remoteEventDispatcher;
+	private AgentsBalancer agentsBalancer;
 	//private ClusterAdministration connectedCluster;
 
 	public Host(String host, int port, String id) throws RemoteException, AlreadyBoundException {
 		node = new NodeInformation(host, port, id);
 		cluster = new ClusterAdministrationImpl(node);
 		remoteEventDispatcher = new RemoteEventDispatcherImpl(node); 
+		agentsBalancer = new AgentsBalancerImpl(node);
 		registry = LocateRegistry.createRegistry(port);
 		registry.bind(Node.CLUSTER_COMUNICATION, cluster);
 		registry.bind(Node.DISTRIBUTED_EVENT_DISPATCHER, remoteEventDispatcher);
+		registry.bind(Node.AGENTS_BALANCER, agentsBalancer);
+		
 		Thread checkConnectedNodes = new Thread(){
 			public void run() {
 				while(true){
@@ -74,6 +80,8 @@ public class Host {
 	public void connect(String host, int port) throws RemoteException, NotBoundException{
 		cluster.connectToGroup(host, port);
 		Registry connectedRegistry = LocateRegistry.getRegistry(host, port);
+		AgentsBalancer agentsBalancerConnected = (AgentsBalancer) connectedRegistry.lookup(Node.AGENTS_BALANCER);
+		agentsBalancerConnected.bullyCoordinator(node, System.currentTimeMillis());
 	}
 
 	public ClusterAdministration getCluster(){

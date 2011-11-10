@@ -6,6 +6,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.HashSet;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -85,17 +86,23 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 				while(true){
 					Registry registry;
 					try {
-						Thread.sleep(10000);
+						Thread.sleep(5000);
 						registry = LocateRegistry.getRegistry(node.host(), node.port());
 						ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
-						for(NodeInformation connectedNode : cluster.connectedNodes()){
-							if(!connectedNode.equals(node)){
-								registry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
-								RemoteEventDispatcher connectedEventDispatcher = (RemoteEventDispatcher)registry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
-								Set<EventInformation> newEvents = connectedEventDispatcher.newEventsFor(node);
-								queue.addAll(newEvents);
-								System.out.println("NEW EVENTS: " + newEvents);
-							}
+						Random random = new Random();
+						Set<NodeInformation> nodes = cluster.connectedNodes();
+						if(nodes.size()>1){
+							int position = random.nextInt(nodes.size()-1);
+							//for(NodeInformation connectedNode : cluster.connectedNodes()){
+								NodeInformation connectedNode = (NodeInformation)nodes.toArray()[position];
+								if(!connectedNode.equals(node)){
+									registry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
+									RemoteEventDispatcher connectedEventDispatcher = (RemoteEventDispatcher)registry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
+									Set<EventInformation> newEvents = connectedEventDispatcher.newEventsFor(node);
+									queue.addAll(newEvents);
+									System.out.println("NEW EVENTS: " + newEvents);
+								}
+							//}
 						}
 					} catch (RemoteException e) {
 						System.out.println(MsgError.CONNECTION_ERROR	);
