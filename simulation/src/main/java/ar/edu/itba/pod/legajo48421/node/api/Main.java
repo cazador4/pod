@@ -12,6 +12,7 @@ import java.util.Set;
 
 import org.joda.time.Duration;
 
+import ar.edu.itba.balance.api.AgentsBalancer;
 import ar.edu.itba.balance.api.NodeAgent;
 import ar.edu.itba.event.EventInformation;
 import ar.edu.itba.node.Node;
@@ -19,6 +20,7 @@ import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.ClusterAdministration;
 import ar.edu.itba.pod.agent.market.Producer;
 import ar.edu.itba.pod.agent.market.Resource;
+import ar.edu.itba.pod.thread.CleanableThread;
 
 public class Main {
 	//Main Server
@@ -29,6 +31,8 @@ public class Main {
 			try {
 				Host host = new Host(args[0], Integer.valueOf(args[1]), args[2]);
 				host.getCluster().createGroup();
+				
+				//host.getAgentsBalancer().bullyCoordinator(host.getNodeInformation(), System.currentTimeMillis());
 
 				System.out.println("Server");
 				while(true){
@@ -48,6 +52,9 @@ public class Main {
 							Resource resource = new Resource("Alloy", "Steel");
 							NodeAgent nodeAgent = new NodeAgent(host.getNodeInformation(), new Producer("steel mine" + 1, resource, Duration.standardDays(1), 5));
 							host.getRemoteEventDispatcher().publish(new EventInformation("New Agent", host.getNodeInformation().id() + System.currentTimeMillis(), nodeAgent.agent()));
+							break;
+						case coord:
+							System.out.println("Coordinator is: " + host.getCoordinator());
 							break;
 						case events:
 							break;
@@ -74,16 +81,29 @@ public class Main {
 					//arg2: node id
 					//arg3: local host
 					//arg4: local port
-					Host host = new Host(args[3], Integer.valueOf(args[4]), args[2]);
+					final Host host = new Host(args[3], Integer.valueOf(args[4]), args[2]);
 					host.connect(args[0], Integer.valueOf(args[1]));
-
-					//Setting up RemoteEventDispatcher
-					//RemoteEventDispatcher myEventDispatcher = new RemoteEventDispatcherImpl();
-					//myRegistry.bind(Node.DISTRIBUTED_EVENT_DISPATCHER, myEventDispatcher);
-
-
-
-
+					
+					Registry connectedRegistry = LocateRegistry.getRegistry(args[0], Integer.valueOf(args[1]));
+					final AgentsBalancer agentsBalancerConnected = (AgentsBalancer) connectedRegistry.lookup(Node.AGENTS_BALANCER);
+					
+					Thread newElection = new CleanableThread("newElection"){
+						public void run(){
+							try {
+								agentsBalancerConnected.bullyElection(host.getNodeInformation(), System.currentTimeMillis());
+								Thread.sleep(Constant.WAIT_FOR_COORDINATOR);
+								if(host.getCoordinator()==null){
+									agentsBalancerConnected.bullyCoordinator(host.getNodeInformation(), System.currentTimeMillis());
+									host.setCoordinator(host.getNodeInformation());
+								}
+							} catch (RemoteException e) {
+								e.printStackTrace();
+							} catch (InterruptedException e) {
+								e.printStackTrace();
+							}
+						}
+					};
+					newElection.start();
 					//Commands
 					while(true){
 						System.out.println("list - close - newevent - events");
@@ -98,8 +118,8 @@ public class Main {
 								Set<NodeInformation> connectedNodes = host.getCluster().connectedNodes();
 								for(NodeInformation node : connectedNodes){
 									if(!node.equals(host.getNodeInformation())){
-										Registry connectedRegistry = LocateRegistry.getRegistry(node.host(), node.port());
-										ClusterAdministration connectedCluster = (ClusterAdministration)connectedRegistry.lookup(Node.CLUSTER_COMUNICATION);
+										Registry reg = LocateRegistry.getRegistry(node.host(), node.port());
+										ClusterAdministration connectedCluster = (ClusterAdministration)reg.lookup(Node.CLUSTER_COMUNICATION);
 										connectedCluster.disconnectFromGroup(host.getNodeInformation());
 									}
 								}
@@ -112,39 +132,9 @@ public class Main {
 								event.setReceivedTime(System.currentTimeMillis());
 								host.getRemoteEventDispatcher().publish(event);
 								
-								/*System.out.println("steel - copper - gold");
-									BufferedReader br2 = new BufferedReader(new InputStreamReader(System.in));
-									String resourceString = br2.readLine();
-									Resource resource = null;
-									switch(ResourceType.toResource(resourceString)){
-										case steel:
-											resource = new Resource("Alloy", "Steel");
-											break;
-										case copper:
-											resource = new Resource("Mineral", "Copper");
-											break;
-										case gold:
-											resource = new Resource("Mineral", "Gold");
-											break;
-									}
-									if(resource!=null){
-										NodeAgent nodeAgent = new NodeAgent(myNodeInformation, new Producer(resourceString + " mine" + 1, resource, Duration.standardDays(1), 5));
-										for(NodeInformation node : myCluster.connectedNodes()){
-											Registry reg = LocateRegistry.getRegistry(node.host(), node.port());
-											RemoteEventDispatcher eventDispatcher = (RemoteEventDispatcher)reg.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
-											try {
-												eventDispatcher.publish(new EventInformation("New Agent", node.id(), nodeAgent.agent()));
-											} catch (InterruptedException e) {
-												e.printStackTrace();
-											}
-										}
-										//RemoteEventDispatcher eventDispatcher = (RemoteEventDispatcher)registryCoord.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
-										//try {
-											//eventDispatcher.publish(new EventInformation("New Agent", "id", nodeAgent.agent()));
-										//} catch (InterruptedException e) {
-										//	e.printStackTrace();
-										//}
-									}*/
+								break;
+							case coord:
+								System.out.println("Coordinator is: " + host.getCoordinator());
 								break;
 							case events:
 								//System.out.println("Events: " + myEventDispatcher.newEventsFor(myNodeInformation));
@@ -171,7 +161,7 @@ public class Main {
 
 	public enum Command
 	{
-		list, close, newevent, events;
+		list, close, newevent, events, coord;
 
 		public static Command toCommand(String str)
 		{

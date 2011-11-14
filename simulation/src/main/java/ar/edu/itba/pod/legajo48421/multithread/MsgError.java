@@ -7,6 +7,7 @@ public class MsgError {
 	
 	
 	public static String CONNECTION_ERROR = "Problems with connection";
+	public static String NO_COORD_AVAILABLE = "No coordinator available, start new election...";
 	
 	public static String connectionError(NodeInformation node){
 		return MsgError.CONNECTION_ERROR + "Host: " + node.host() + " Port " + node.port();

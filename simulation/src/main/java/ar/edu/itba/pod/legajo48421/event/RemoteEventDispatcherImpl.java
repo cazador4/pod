@@ -48,7 +48,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 					Object event;
 					try {
 						event = queue.take();
-						if(!processingEvents.containsKey(event) && !queue.contains(event)){
+						if(!processingEvents.containsKey(event)){
 							System.out.println(event);
 							processingEvents.put((EventInformation)event, System.currentTimeMillis());
 							Registry registry = LocateRegistry.getRegistry(node.host(), node.port());

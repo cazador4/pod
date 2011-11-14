@@ -5,20 +5,20 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.HashSet;
 import java.util.Set;
-
-import com.google.common.base.Preconditions;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 import ar.edu.itba.node.Node;
 import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.ClusterAdministration;
 
+import com.google.common.base.Preconditions;
+
 public class ClusterAdministrationImpl implements ClusterAdministration{
 
 	private String group;
 	private NodeInformation node;
-	private Set<NodeInformation> connectedNodes = new HashSet<NodeInformation>();
+	private CopyOnWriteArraySet<NodeInformation> connectedNodes = new CopyOnWriteArraySet<NodeInformation>();
 
 	public ClusterAdministrationImpl(NodeInformation node){
 		try {
