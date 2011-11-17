@@ -20,7 +20,6 @@ import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.ClusterAdministration;
 import ar.edu.itba.pod.agent.market.Producer;
 import ar.edu.itba.pod.agent.market.Resource;
-import ar.edu.itba.pod.thread.CleanableThread;
 
 public class Main {
 	//Main Server
@@ -31,8 +30,8 @@ public class Main {
 			try {
 				Host host = new Host(args[0], Integer.valueOf(args[1]), args[2]);
 				host.getCluster().createGroup();
-				
-				//host.getAgentsBalancer().bullyCoordinator(host.getNodeInformation(), System.currentTimeMillis());
+
+				host.getAgentsBalancer().bullyCoordinator(host.getNodeInformation(), System.currentTimeMillis());
 
 				System.out.println("Server");
 				while(true){
@@ -83,27 +82,24 @@ public class Main {
 					//arg4: local port
 					final Host host = new Host(args[3], Integer.valueOf(args[4]), args[2]);
 					host.connect(args[0], Integer.valueOf(args[1]));
-					
+
 					Registry connectedRegistry = LocateRegistry.getRegistry(args[0], Integer.valueOf(args[1]));
 					final AgentsBalancer agentsBalancerConnected = (AgentsBalancer) connectedRegistry.lookup(Node.AGENTS_BALANCER);
-					
-					Thread newElection = new CleanableThread("newElection"){
-						public void run(){
-							try {
-								agentsBalancerConnected.bullyElection(host.getNodeInformation(), System.currentTimeMillis());
-								Thread.sleep(Constant.WAIT_FOR_COORDINATOR);
-								if(host.getCoordinator()==null){
-									agentsBalancerConnected.bullyCoordinator(host.getNodeInformation(), System.currentTimeMillis());
-									host.setCoordinator(host.getNodeInformation());
-								}
-							} catch (RemoteException e) {
-								e.printStackTrace();
-							} catch (InterruptedException e) {
-								e.printStackTrace();
-							}
+
+					try {
+//						System.out.println("Envio una eleccion");
+						agentsBalancerConnected.bullyElection(host.getNodeInformation(), System.currentTimeMillis());
+						Thread.sleep(5000);
+						//System.out.println("Ya termine la eleccion! que paso??");
+						if(host.getCoordinator()==null){
+							agentsBalancerConnected.bullyCoordinator(host.getNodeInformation(), System.currentTimeMillis());
+							host.setCoordinator(host.getNodeInformation());
 						}
-					};
-					newElection.start();
+					} catch (RemoteException e) {
+						e.printStackTrace();
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}	
 					//Commands
 					while(true){
 						System.out.println("list - close - newevent - events");
@@ -131,7 +127,7 @@ public class Main {
 								EventInformation event = new EventInformation("New Agent", host.getNodeInformation().id(), nodeAgent.agent());
 								event.setReceivedTime(System.currentTimeMillis());
 								host.getRemoteEventDispatcher().publish(event);
-								
+
 								break;
 							case coord:
 								System.out.println("Coordinator is: " + host.getCoordinator());

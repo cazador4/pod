@@ -5,8 +5,9 @@ import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.util.HashSet;
-import java.util.Iterator;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 import ar.edu.itba.balance.api.AgentsBalancer;
@@ -27,18 +28,17 @@ public class Host {
 	private RemoteEventDispatcher remoteEventDispatcher;
 	private AgentsBalancer agentsBalancer;
 	private NodeInformation coordinator;
-	private long timestampCoordinator;
 
 	public AgentsBalancer getAgentsBalancer() {
 		return agentsBalancer;
 	}
 
 	public Host(String host, int port, String id) throws RemoteException, AlreadyBoundException {
+		registry = LocateRegistry.createRegistry(port);
 		node = new NodeInformation(host, port, id);
 		cluster = new ClusterAdministrationImpl(node);
-		remoteEventDispatcher = new RemoteEventDispatcherImpl(node); 
+		remoteEventDispatcher = new RemoteEventDispatcherImpl(this); 
 		agentsBalancer = new AgentsBalancerImpl(this);
-		registry = LocateRegistry.createRegistry(port);
 		registry.bind(Node.CLUSTER_COMUNICATION, cluster);
 		registry.bind(Node.DISTRIBUTED_EVENT_DISPATCHER, remoteEventDispatcher);
 		registry.bind(Node.AGENTS_BALANCER, agentsBalancer);
@@ -47,7 +47,6 @@ public class Host {
 			public void run() {
 				while(true){
 					try {
-
 						Thread.sleep(1000);
 						try {
 
@@ -65,11 +64,12 @@ public class Host {
 											Set<NodeInformation> connectedNodes = cluster.connectedNodes();
 											if(connectedNodes.size()>1){
 												boolean flag=true;
-												int i=0;
-												Object[] arrayNodes= connectedNodes.toArray(); 
+												List<NodeInformation> list = new ArrayList<NodeInformation>(connectedNodes);
+												Collections.shuffle(list);
 												while(flag){
-													NodeInformation nodoToSendElection = (NodeInformation) arrayNodes[i];
-													if(!node.equals(nodoToSendElection)){
+													if(list.size()>0){
+														NodeInformation nodoToSendElection = list.remove(0);
+													//if(!node.equals(nodoToSendElection)){
 														Registry electionRegistry = LocateRegistry.getRegistry(nodoToSendElection.host(), nodoToSendElection.port());
 														final AgentsBalancer electionBalancer = (AgentsBalancer) electionRegistry.lookup(Node.AGENTS_BALANCER);
 														Thread newElection = new Thread(){
@@ -80,18 +80,17 @@ public class Host {
 																	if(coordinator==null){
 																		electionBalancer.bullyCoordinator(node, System.currentTimeMillis());
 																	}
-																} catch (RemoteException e) {
-																	e.printStackTrace();
-																} catch (InterruptedException e) {
-																	e.printStackTrace();
+																} catch (RemoteException e2) {
+																	e2.printStackTrace();
+																} catch (InterruptedException e3) {
+																	e3.printStackTrace();
 																}
 															}
 														};
 														newElection.start();
 														flag=false;
-
 													}
-													i++;
+													//}
 												}
 											}
 
@@ -100,11 +99,11 @@ public class Host {
 										e1.printStackTrace();
 									}
 								} catch (NotBoundException e) {
-									try {
+									/*try {
 										cluster.disconnectFromGroup(connectedNode);
 									} catch (NotBoundException e1) {
 										e1.printStackTrace();
-									}
+									}*/
 								}
 							}
 						} catch (RemoteException e) {
@@ -137,11 +136,12 @@ public class Host {
 		return remoteEventDispatcher;
 	}
 
-	public NodeInformation getCoordinator() {
+	public synchronized NodeInformation getCoordinator() {
 		return coordinator;
 	}
 
-	public void setCoordinator(NodeInformation coordinator) {
+	public synchronized void setCoordinator(NodeInformation coordinator) {
 		this.coordinator = coordinator;
+//		System.out.println("Soy el nodo con id " + node.id() + " El coord es: " + coordinator);
 	}
 }

@@ -7,6 +7,8 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import ar.edu.itba.balance.api.AgentsBalancer;
@@ -21,10 +23,11 @@ import ar.edu.itba.pod.thread.CleanableThread;
 public class AgentsBalancerImpl implements AgentsBalancer{
 
 	private Host host;
-	private long timestampElection;
 	private NodeInformation myNode;
-	private AtomicBoolean havePossibility = new AtomicBoolean(true);
-	private long timestampCoordinator;
+	private AtomicBoolean isOnElection = new AtomicBoolean(false);
+	private Map<NodeInformation, Long> elections; //msg elections
+	private Map<NodeInformation, Long> coordinators; //msg coordinators
+	private AtomicBoolean isOk = new AtomicBoolean(true);
 
 	public AgentsBalancerImpl(Host host){
 		try {
@@ -34,94 +37,94 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 		}
 		this.host = host;
 		myNode = host.getNodeInformation();
+		elections = new ConcurrentHashMap<NodeInformation, Long>();
+		coordinators = new ConcurrentHashMap<NodeInformation, Long>();
 	}
 
 	@Override
-	public void bullyElection(NodeInformation node, long timestamp)
+	public void bullyElection(final NodeInformation node, final long timestamp)
 			throws RemoteException {
-		if(timestamp!=timestampElection){
-			final NodeInformation sendElectionNode = node;
-			final long sendTimestamp = timestamp;
-			havePossibility.set(true);
-			timestampElection = timestamp;
+		if(checkElection(node, timestamp)){
+			//elections.put(node, timestamp);
 			//VEO SI TENGO MAYOR ID QUE EL QUE LLEGA
 			if(myNode.id().compareTo(node.id())>0){
-				getBalancer(node).bullyOk(myNode);
-				for(final NodeInformation connectedNode : host.getCluster().connectedNodes()){
-					if(connectedNode!=myNode && connectedNode!=node){
-						Thread newElection = new CleanableThread("newElection"){
-							public void run(){
-								try {
-									getBalancer(connectedNode).bullyElection(myNode, System.currentTimeMillis());
-									try {
-										Thread.sleep(Constant.WAIT_FOR_COORDINATOR);
-										if(havePossibility.get()){
-											for(NodeInformation connectedNode : host.getCluster().connectedNodes()){
-												if(connectedNode!=myNode){
-													getBalancer(connectedNode).bullyCoordinator(myNode, System.currentTimeMillis());
-												}
-											}
-											host.setCoordinator(myNode);
-										}
-									} catch (InterruptedException e) {
-										e.printStackTrace();
-									}
-								} catch (RemoteException e) {
-									try {
-										host.getCluster().disconnectFromGroup(connectedNode);
-									} catch (RemoteException e1) {
-										e1.printStackTrace();
-									} catch (NotBoundException e1) {
-										e1.printStackTrace();
+				isOk.set(true);
+				//System.out.println("Hice un ok! al nodo: "+ node);
+				if(!isOnElection.getAndSet(true)){
+					Thread newElection = new CleanableThread("newElection"){
+						public void run(){
+							try {
+								//System.out.println("Mande una eleccion!");
+								getBalancer(node).bullyOk(myNode);
+								long timeElection = System.currentTimeMillis();
+								for(final NodeInformation connectedNode : host.getCluster().connectedNodes()){
+									if(!connectedNode.equals(myNode) && !connectedNode.equals(node)){
+										getBalancer(connectedNode).bullyElection(myNode, timeElection);
 									}
 								}
+								try {
+									Thread.sleep(Constant.WAIT_FOR_COORDINATOR);
+									isOnElection.set(false);
+									if(isOk.get()){
+//										System.out.println("Seteo que el coord soy yo!");
+										long timeCoord=System.currentTimeMillis();
+										for(NodeInformation connectedNode2 : host.getCluster().connectedNodes()){
+											getBalancer(connectedNode2).bullyCoordinator(myNode, timeCoord);
+										}
+										host.setCoordinator(myNode);
+									}
+								} catch (InterruptedException e) {
+									e.printStackTrace();
+								}
+							} catch (RemoteException e) {
 							}
-						};
-						newElection.start();
-						
-					}
+						}
+					};
+					newElection.start();
+				}
+				else{
+					getBalancer(node).bullyOk(myNode);
 				}
 			}
 			else{
-				for(final NodeInformation connectedNode : host.getCluster().connectedNodes()){
-					if(connectedNode!=myNode && connectedNode!=node){
-						Thread newElection = new CleanableThread("newElection"){
-							public void run(){
-								try {
-									getBalancer(connectedNode).bullyElection(sendElectionNode, sendTimestamp);
-								} catch (RemoteException e) {
-									try {
-										host.getCluster().disconnectFromGroup(connectedNode);
-									} catch (RemoteException e1) {
-										e1.printStackTrace();
-									} catch (NotBoundException e1) {
+//				System.out.println("Mi nodo es menor");
+				Thread broadcastElection = new CleanableThread("broadcastElection") {
+					public void run(){
+						try {
+//							System.out.println("Hago broadCast de la eleccion del nodo: "+ node + " con tiempo "+ timestamp);
+							for(NodeInformation connectedNode : host.getCluster().connectedNodes()){
+								if(!connectedNode.equals(node) && !connectedNode.equals(myNode)){
+									try{
+										getBalancer(connectedNode).bullyElection(node, timestamp);
+									} catch(RemoteException e1){
 										e1.printStackTrace();
 									}
 								}
 							}
-						};
-						newElection.start();
-						
+						} catch (RemoteException e) {
+							e.printStackTrace();
+						}
 					}
-				}
+				};
+				broadcastElection.start();
 			}
 		}
 	}
 
 	private AgentsBalancer getBalancer(NodeInformation node){
-		 try {
-			 Registry reg = LocateRegistry.getRegistry(node.host(), node.port());
+		try {
+			Registry reg = LocateRegistry.getRegistry(node.host(), node.port());
 			return (AgentsBalancer)reg.lookup(Node.AGENTS_BALANCER);
 		} catch (AccessException e) {
 			e.printStackTrace();
 		} catch (RemoteException e) {
-			try {
+			/*try {
 				host.getCluster().disconnectFromGroup(node);
 			} catch (RemoteException e1) {
 				e1.printStackTrace();
 			} catch (NotBoundException e1) {
 				e1.printStackTrace();
-			}
+			}*/
 		} catch (NotBoundException e) {
 			e.printStackTrace();
 		}
@@ -130,20 +133,58 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 
 	@Override
 	public void bullyOk(NodeInformation node) throws RemoteException {
-		havePossibility.set(false);
+		isOk.set(false);
+		System.out.println("El nodo " + node + " Me hicieron un ok");
+	}
+
+	private synchronized boolean checkElection(NodeInformation node, long timestamp){
+		/*System.out.println("Llego " + node + " tiempo " + timestamp);
+		System.out.println("Size de elections: " + elections.size());
+		System.out.println("elections contiene al nodo" + elections.containsKey(node));
+		if(elections.containsKey(node)){
+			System.out.println("el timestamp es mayor al que ya tengo? " + (elections.get(node).longValue()<timestamp));
+			System.out.println(elections.get(node).longValue());
+		}*/
+		if(!elections.containsKey(node) || elections.get(node)<timestamp)
+		{
+			elections.put(node, timestamp);
+			return true;
+		}
+		return false;
+	}
+
+	public synchronized boolean checkCoordinator(NodeInformation node, long timestamp){
+		if(!coordinators.containsKey(node) || coordinators.get(node)<timestamp){
+			coordinators.put(node, timestamp);
+			return true;
+		}
+		return false;
 	}
 
 	@Override
-	public void bullyCoordinator(NodeInformation node, long timestamp)
+	public void bullyCoordinator(final NodeInformation node, final long timestamp)
 			throws RemoteException {
-		if(timestamp!=timestampCoordinator){
-			timestampCoordinator=timestamp;
+		if(checkCoordinator(node, timestamp)){
 			host.setCoordinator(node);
-			for(NodeInformation connectedNode : host.getCluster().connectedNodes()){
-				if(!connectedNode.equals(node) && !connectedNode.equals(myNode) ){
-					getBalancer(connectedNode).bullyCoordinator(node, timestamp);
+//			System.out.println("El coordinador es: " + node +" en el tiempo: " + timestamp);
+			Thread newCoordinator = new CleanableThread("newCoordinator") {
+				public void run(){
+					try {
+						for(NodeInformation connectedNode : host.getCluster().connectedNodes()){
+							if(!connectedNode.equals(node) && !connectedNode.equals(myNode) ){
+								try{
+									getBalancer(connectedNode).bullyCoordinator(node, timestamp);
+								} catch (RemoteException e) {
+									e.printStackTrace();
+								}
+							}
+						}
+					} catch (RemoteException e) {
+						e.printStackTrace();
+					}
 				}
-			}
+			};
+			newCoordinator.start();
 		}
 	}
 

@@ -14,6 +14,7 @@ public class AgentsTransferImpl implements AgentsTransfer{
 	public void runAgentsOnNode(List<NodeAgent> agents) throws RemoteException {
 		if(agents!=null)
 			nodeAgents = agents;
+			
 		//TODO RUN
 	}
 
