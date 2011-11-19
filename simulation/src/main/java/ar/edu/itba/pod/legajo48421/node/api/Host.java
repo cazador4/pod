@@ -7,16 +7,25 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import org.joda.time.Duration;
+
 import ar.edu.itba.balance.api.AgentsBalancer;
+import ar.edu.itba.balance.api.AgentsTransfer;
 import ar.edu.itba.event.RemoteEventDispatcher;
 import ar.edu.itba.node.Node;
 import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.ClusterAdministration;
 import ar.edu.itba.pod.legajo48421.balance.api.AgentsBalancerImpl;
+import ar.edu.itba.pod.legajo48421.balance.api.AgentsTransferImpl;
 import ar.edu.itba.pod.legajo48421.event.RemoteEventDispatcherImpl;
+import ar.edu.itba.pod.legajo48421.multithread.ClusterSimulation;
+import ar.edu.itba.pod.legajo48421.multithread.ExtendedMultiThreadEventDispatcher;
+import ar.edu.itba.pod.time.TimeMappers;
 
 import com.google.common.base.Preconditions;
 
@@ -27,11 +36,11 @@ public class Host {
 	private Registry registry;
 	private RemoteEventDispatcher remoteEventDispatcher;
 	private AgentsBalancer agentsBalancer;
+	private AgentsTransfer agentsTransfer;
 	private NodeInformation coordinator;
-
-	public AgentsBalancer getAgentsBalancer() {
-		return agentsBalancer;
-	}
+	private ExtendedMultiThreadEventDispatcher extendedMultiThreadEventDispatcher;
+	private ClusterSimulation simulation = new ClusterSimulation(TimeMappers.oneSecondEach(Duration.standardHours(6)), this);
+	private Map<NodeInformation, Integer> nodeCountAgentMap = new HashMap<NodeInformation, Integer>();
 
 	public Host(String host, int port, String id) throws RemoteException, AlreadyBoundException {
 		registry = LocateRegistry.createRegistry(port);
@@ -39,10 +48,14 @@ public class Host {
 		cluster = new ClusterAdministrationImpl(node);
 		remoteEventDispatcher = new RemoteEventDispatcherImpl(this); 
 		agentsBalancer = new AgentsBalancerImpl(this);
+		extendedMultiThreadEventDispatcher = new ExtendedMultiThreadEventDispatcher(this);
+		agentsTransfer = new AgentsTransferImpl(this);
 		registry.bind(Node.CLUSTER_COMUNICATION, cluster);
 		registry.bind(Node.DISTRIBUTED_EVENT_DISPATCHER, remoteEventDispatcher);
 		registry.bind(Node.AGENTS_BALANCER, agentsBalancer);
-
+		registry.bind(Node.AGENTS_TRANSFER, agentsTransfer);
+		
+		
 		Thread checkConnectedNodes = new Thread(){
 			public void run() {
 				while(true){
@@ -142,6 +155,25 @@ public class Host {
 
 	public synchronized void setCoordinator(NodeInformation coordinator) {
 		this.coordinator = coordinator;
-//		System.out.println("Soy el nodo con id " + node.id() + " El coord es: " + coordinator);
+	}
+	
+	public ExtendedMultiThreadEventDispatcher getExtendedMultiThreadEventDispatcher() {
+		return extendedMultiThreadEventDispatcher;
+	}
+
+	public synchronized boolean isCoordinator(){
+		return node.equals(coordinator);
+	}
+	
+	public AgentsBalancer getAgentsBalancer() {
+		return agentsBalancer;
+	}
+
+	public AgentsTransfer getAgentsTransfer() {
+		return agentsTransfer;
+	}
+
+	public ClusterSimulation getSimulation() {
+		return simulation;
 	}
 }

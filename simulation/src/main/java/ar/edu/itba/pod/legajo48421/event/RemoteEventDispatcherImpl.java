@@ -1,12 +1,12 @@
 package ar.edu.itba.pod.legajo48421.event;
 
-import java.rmi.AccessException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.HashSet;
+import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -27,33 +27,40 @@ import ar.edu.itba.pod.thread.CleanableThread;
 public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 
 
-	private final BlockingQueue<Object> queue;
+	private final BlockingQueue<EventInformation> queue;
 	private final Host host;
 	ConcurrentMap<EventInformation, Long> processingEvents;
+	ConcurrentMap<NodeInformation, Long> lastTimeSendEvent;
 
 
 
 	public RemoteEventDispatcherImpl(final Host host){
 
-		this.queue = new LinkedBlockingQueue<Object>();
+		this.queue = new LinkedBlockingQueue<EventInformation>();
 		this.host = host;
 		processingEvents = new ConcurrentHashMap<EventInformation, Long>(); 
-
+		lastTimeSendEvent = new ConcurrentHashMap<NodeInformation, Long>();
 		try {
 			UnicastRemoteObject.exportObject(this, 0);
 		} catch (RemoteException e1) {
 			e1.printStackTrace();
 		}
-		Thread getQueueEvent = new Thread(){
+		Thread getQueueEvent = new CleanableThread("getQueueEvent") {
 			@Override
 			public void run() {
 				while(true){
-					Object event;
+					EventInformation eventInformation;
 					try {
-						event = queue.take();
-						if(!processingEvents.containsKey(event)){
-							System.out.println(event);
-							processingEvents.put((EventInformation)event, System.currentTimeMillis());
+						eventInformation = queue.take();
+						//if(!processingEvents.containsKey(eventInformation)){
+						//if(eventInformation.nodeId().equals(host.getNodeInformation().id())){
+							processingEvents.put((EventInformation)eventInformation, System.currentTimeMillis());
+							host.getExtendedMultiThreadEventDispatcher().publishIntern(eventInformation.source(), eventInformation.event());
+						//}
+						//else
+						//{
+							//System.out.println(eventInformation);
+							//processingEvents.put((EventInformation)eventInformation, System.currentTimeMillis());
 							Registry registry = LocateRegistry.getRegistry(host.getNodeInformation().host(), host.getNodeInformation().port());
 							ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
 							int countFalse = 0;
@@ -64,13 +71,14 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 									if(!connectedNode.equals(host.getNodeInformation())){
 										Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
 										RemoteEventDispatcher remoteEventDispatcher = (RemoteEventDispatcher)connectedRegistry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
-										boolean answer = remoteEventDispatcher.publish((EventInformation)event);
+										lastTimeSendEvent.put(connectedNode, System.currentTimeMillis());
+										boolean answer = remoteEventDispatcher.publish((EventInformation)eventInformation);
 										if(!answer)
 											countFalse++;
 									}
 								}
 							}
-						}
+						//}
 					} catch (RemoteException e) {
 						e.printStackTrace();
 					} catch (NotBoundException e) {
@@ -83,7 +91,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 		};
 		getQueueEvent.start();
 
-		Thread getNewEvent = new Thread(){
+		Thread getNewEvent = new CleanableThread("getNewEvent"){
 			@Override
 			public void run() {
 				while(true){
@@ -118,7 +126,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 				}
 			}
 		};
-		//getNewEvent.start();
+		getNewEvent.start();
 	}
 
 	@Override
@@ -126,7 +134,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 	InterruptedException {
 		if(!queue.contains(event) && !processingEvents.containsKey(event)){
 			queue.add(event);
-			Thread newPublish = new CleanableThread("newPublish") {
+			/*Thread newPublish = new CleanableThread("newPublish") {
 				public void run(){
 					try {
 						for(NodeInformation connectedNode : host.getCluster().connectedNodes()){
@@ -145,18 +153,18 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 					}
 				}	
 			};
-			newPublish.start();
+			//newPublish.start();*/
 			return true;
 		}
 		return false;
 	}
 
-	private Set<EventInformation> findInQueue(String nodeId) {
+	private Set<EventInformation> findInQueue(String nodeId, long timestamp) {
 		Set<EventInformation> result = new HashSet<EventInformation>();
-		for(Object event : queue){
-			EventInformation eventInfo = (EventInformation)event;
-			if(eventInfo.nodeId().equals(nodeId))
-				result.add(eventInfo);
+		for(Entry<EventInformation, Long> entry : processingEvents.entrySet()){
+			if(timestamp<entry.getValue()){
+				result.add(entry.getKey());
+			}
 		}
 		return result;
 	}
@@ -164,7 +172,10 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 	@Override
 	public Set<EventInformation> newEventsFor(NodeInformation nodeInformation)
 			throws RemoteException {
-		return findInQueue(nodeInformation.id());
+		Long timestamp = lastTimeSendEvent.get(nodeInformation);
+		if(timestamp==null)
+			timestamp=0l;
+		return findInQueue(nodeInformation.id(), timestamp);
 	}
 
 	@Override

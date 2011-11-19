@@ -18,8 +18,12 @@ import ar.edu.itba.event.EventInformation;
 import ar.edu.itba.node.Node;
 import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.ClusterAdministration;
+import ar.edu.itba.pod.agent.market.Market;
 import ar.edu.itba.pod.agent.market.Producer;
 import ar.edu.itba.pod.agent.market.Resource;
+import ar.edu.itba.pod.legajo48421.multithread.ClusterSimulation;
+import ar.edu.itba.pod.time.TimeMapper;
+import ar.edu.itba.pod.time.TimeMappers;
 
 public class Main {
 	//Main Server
@@ -33,7 +37,19 @@ public class Main {
 
 				host.getAgentsBalancer().bullyCoordinator(host.getNodeInformation(), System.currentTimeMillis());
 
-				System.out.println("Server");
+				Resource steel = new Resource("Alloy", "Steel");
+				TimeMapper timeMapper = TimeMappers.oneSecondEach(Duration.standardHours(6));
+				ClusterSimulation node = new ClusterSimulation(timeMapper, host);
+				//for (int i = 0; i < 1; i++) {
+					node.add(new Market("steel market", steel));
+					//node.add(new Consumer("steel consumer" + i, steel, Duration.standardDays(3), 2));
+				//}
+				try {
+					node.startAndWait(Duration.standardSeconds(5000));
+				} catch (InterruptedException e1) {
+					e1.printStackTrace();
+				}
+				/*System.out.println("Server");
 				while(true){
 					System.out.println("list - close - newevent - events");
 					BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
@@ -62,7 +78,7 @@ public class Main {
 					catch (Exception e) {
 						System.out.println(e.getMessage());
 					}
-				}
+				}*/
 			} catch (RemoteException e1) {
 				e1.printStackTrace();
 			} catch (NumberFormatException e) {
@@ -94,6 +110,7 @@ public class Main {
 						if(host.getCoordinator()==null){
 							agentsBalancerConnected.bullyCoordinator(host.getNodeInformation(), System.currentTimeMillis());
 							host.setCoordinator(host.getNodeInformation());
+							
 						}
 					} catch (RemoteException e) {
 						e.printStackTrace();

@@ -6,12 +6,16 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import ar.edu.itba.balance.api.AgentsBalancer;
+import ar.edu.itba.balance.api.AgentsTransfer;
 import ar.edu.itba.balance.api.NodeAgent;
 import ar.edu.itba.balance.api.NotCoordinatorException;
 import ar.edu.itba.node.Node;
@@ -138,13 +142,6 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 	}
 
 	private synchronized boolean checkElection(NodeInformation node, long timestamp){
-		/*System.out.println("Llego " + node + " tiempo " + timestamp);
-		System.out.println("Size de elections: " + elections.size());
-		System.out.println("elections contiene al nodo" + elections.containsKey(node));
-		if(elections.containsKey(node)){
-			System.out.println("el timestamp es mayor al que ya tengo? " + (elections.get(node).longValue()<timestamp));
-			System.out.println(elections.get(node).longValue());
-		}*/
 		if(!elections.containsKey(node) || elections.get(node)<timestamp)
 		{
 			elections.put(node, timestamp);
@@ -191,11 +188,85 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 	@Override
 	public void shutdown(List<NodeAgent> agents) throws RemoteException,
 	NotCoordinatorException {
+		if(host.isCoordinator()){
+			//BALANCEO
+		}
+		else{
+			NodeInformation coord = host.getCoordinator();
+			if(coord!=null){
+				Registry reg = LocateRegistry.getRegistry(coord.host(), coord.port());
+				AgentsBalancer agentsBalancer;
+				try {
+					agentsBalancer = (AgentsBalancer)reg.lookup(Node.AGENTS_BALANCER);
+					agentsBalancer.shutdown(agents);
+				} catch (NotBoundException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		
 	}
 
 	@Override
 	public void addAgentToCluster(NodeAgent agent) throws RemoteException,
 	NotCoordinatorException {
+		if(host.isCoordinator()){
+			
+			Set<NodeInformation> nodes = host.getCluster().connectedNodes();
+			int cantNodes = nodes.size();
+			List<NodeAgent> list = new ArrayList<NodeAgent>();
+			list.add(agent);
+			if(cantNodes==1){
+				list.add(agent);
+				host.getAgentsTransfer().runAgentsOnNode(list);
+			}
+			else{
+				List<NodeInformation> lista = new ArrayList<NodeInformation>();
+				lista.addAll(nodes);
+				lista.remove(host.getNodeInformation());
+				Registry regMore = LocateRegistry.getRegistry(lista.get(0).host(), lista.get(0).port());
+				AgentsTransfer agentMore;
+				try {
+					agentMore = (AgentsTransfer)regMore.lookup(Node.AGENTS_TRANSFER);
+					agentMore.runAgentsOnNode(list);
+				} catch (NotBoundException e) {
+					e.printStackTrace();
+				}
+				//System.out.println(lista);
+				/*for(int i=0; i<cantNodes;i++){
+					//System.out.println(host.getNodeInformation());
+					//if(!list.get(i).equals(host.getNodeInformation())){
+						System.out.println(lista.get(i).port());
+						Registry regMore = LocateRegistry.getRegistry(lista.get(1).host(), lista.get(1).port());
+						AgentsTransfer agentMore;
+						try {
+							agentMore = (AgentsTransfer)regMore.lookup(Node.AGENTS_TRANSFER);
+							agentMore.runAgentsOnNode(list);
+						} catch (NotBoundException e) {
+							e.printStackTrace();
+						}
+					}*/
+					/*if(i<cantNodes){
+						Registry regLess = LocateRegistry.getRegistry(list.get(i).host(), list.get(i).port());
+						Registry regMore = LocateRegistry.getRegistry(list.get(i).host(), list.get(i).port());
+						try {
+							AgentsTransfer agentLess = (AgentsTransfer)regLess.lookup(Node.AGENTS_TRANSFER);
+							AgentsTransfer agentMore = (AgentsTransfer)regMore.lookup(Node.AGENTS_TRANSFER);
+							if(agentLess.getNumberOfAgents()>agentMore.getNumberOfAgents()){
+								//agentMore.runAgentsOnNode(agents)
+							}
+							
+						} catch (NotBoundException e) {
+							e.printStackTrace();
+						}
+					}
+					*/
+				//}
+			}
+				
+		}
+		else
+			throw new NotCoordinatorException(host.getNodeInformation());
 	}
 
 }

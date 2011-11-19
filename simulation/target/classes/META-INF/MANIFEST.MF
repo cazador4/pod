@@ -1,8 +1,0 @@
-Manifest-Version: 1.0
-Built-By: Dani
-Build-Jdk: 1.6.0_29
-Class-Path: agent-1.0.jar guava-10.0.1.jar jsr305-1.3.9.jar google-col
- lections-1.0.jar joda-time-2.0.jar
-Main-Class: ar.edu.itba.pod.legajo48421.node.api.Main
-Created-By: Maven Integration for Eclipse
-

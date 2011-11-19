@@ -1,7 +1,0 @@
-Manifest-Version: 1.0
-Built-By: Dani
-Build-Jdk: 1.6.0_29
-Main-Class: ar.edu.itba.pod.legajo48421.node.api.ClusterAdministration
- Impl
-Created-By: Maven Integration for Eclipse
-
