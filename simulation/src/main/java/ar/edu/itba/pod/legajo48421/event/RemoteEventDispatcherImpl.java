@@ -52,33 +52,25 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 					EventInformation eventInformation;
 					try {
 						eventInformation = queue.take();
-						//if(!processingEvents.containsKey(eventInformation)){
-						//if(eventInformation.nodeId().equals(host.getNodeInformation().id())){
-							processingEvents.put((EventInformation)eventInformation, System.currentTimeMillis());
-							host.getExtendedMultiThreadEventDispatcher().publishIntern(eventInformation.source(), eventInformation.event());
-						//}
-						//else
-						//{
-							//System.out.println(eventInformation);
-							//processingEvents.put((EventInformation)eventInformation, System.currentTimeMillis());
-							Registry registry = LocateRegistry.getRegistry(host.getNodeInformation().host(), host.getNodeInformation().port());
-							ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
-							int countFalse = 0;
-							//TODO ver cuantos false recibo del publish para no seguir mandando!
-							Set<NodeInformation> connectedNodes = cluster.connectedNodes();
-							for(NodeInformation connectedNode : connectedNodes){
-								if(countFalse<=connectedNodes.size()/2){
-									if(!connectedNode.equals(host.getNodeInformation())){
-										Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
-										RemoteEventDispatcher remoteEventDispatcher = (RemoteEventDispatcher)connectedRegistry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
-										lastTimeSendEvent.put(connectedNode, System.currentTimeMillis());
-										boolean answer = remoteEventDispatcher.publish((EventInformation)eventInformation);
-										if(!answer)
-											countFalse++;
-									}
+						processingEvents.put((EventInformation)eventInformation, System.currentTimeMillis());
+						host.getExtendedMultiThreadEventDispatcher().publishIntern(eventInformation.source(), eventInformation.event());
+						Registry registry = LocateRegistry.getRegistry(host.getNodeInformation().host(), host.getNodeInformation().port());
+						ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
+						int countFalse = 0;
+						//TODO ver cuantos false recibo del publish para no seguir mandando!
+						Set<NodeInformation> connectedNodes = cluster.connectedNodes();
+						for(NodeInformation connectedNode : connectedNodes){
+							if(countFalse<=connectedNodes.size()/2){
+								if(!connectedNode.equals(host.getNodeInformation())){
+									Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
+									RemoteEventDispatcher remoteEventDispatcher = (RemoteEventDispatcher)connectedRegistry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
+									lastTimeSendEvent.put(connectedNode, System.currentTimeMillis());
+									boolean answer = remoteEventDispatcher.publish((EventInformation)eventInformation);
+									if(!answer)
+										countFalse++;
 								}
 							}
-						//}
+						}
 					} catch (RemoteException e) {
 						e.printStackTrace();
 					} catch (NotBoundException e) {
@@ -104,16 +96,14 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 						Set<NodeInformation> nodes = cluster.connectedNodes();
 						if(nodes.size()>1){
 							int position = random.nextInt(nodes.size()-1);
-							//for(NodeInformation connectedNode : cluster.connectedNodes()){
 							NodeInformation connectedNode = (NodeInformation)nodes.toArray()[position];
 							if(!connectedNode.equals(host.getNodeInformation())){
 								registry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
 								RemoteEventDispatcher connectedEventDispatcher = (RemoteEventDispatcher)registry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
 								Set<EventInformation> newEvents = connectedEventDispatcher.newEventsFor(host.getNodeInformation());
 								queue.addAll(newEvents);
-								System.out.println("NEW EVENTS: " + newEvents);
+								//System.out.println("NEW EVENTS: " + newEvents);
 							}
-							//}
 						}
 					} catch (RemoteException e) {
 						System.out.println(MsgError.CONNECTION_ERROR	);
@@ -132,29 +122,8 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 	@Override
 	public boolean publish(final EventInformation event) throws RemoteException,
 	InterruptedException {
-		//System.out.println("ASDASDADSASD " + event.nodeId());
 		if(!queue.contains(event) && !processingEvents.containsKey(event)){
 			queue.add(event);
-			/*Thread newPublish = new CleanableThread("newPublish") {
-				public void run(){
-					try {
-						for(NodeInformation connectedNode : host.getCluster().connectedNodes()){
-							Registry reg = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
-							RemoteEventDispatcher dispatcher = (RemoteEventDispatcher)reg.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
-							dispatcher.publish(event);
-						}
-					} catch (AccessException e) {
-						e.printStackTrace();
-					} catch (RemoteException e) {
-						e.printStackTrace();
-					} catch (NotBoundException e) {
-						e.printStackTrace();
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-				}	
-			};
-			//newPublish.start();*/
 			return true;
 		}
 		return false;

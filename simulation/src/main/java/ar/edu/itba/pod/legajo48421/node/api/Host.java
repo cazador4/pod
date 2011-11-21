@@ -5,6 +5,7 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.SocketException;
+import java.rmi.AccessException;
 import java.rmi.AlreadyBoundException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
@@ -31,6 +32,7 @@ import ar.edu.itba.pod.legajo48421.balance.api.AgentsTransferImpl;
 import ar.edu.itba.pod.legajo48421.event.RemoteEventDispatcherImpl;
 import ar.edu.itba.pod.legajo48421.multithread.ClusterSimulation;
 import ar.edu.itba.pod.legajo48421.multithread.ExtendedMultiThreadEventDispatcher;
+import ar.edu.itba.pod.thread.CleanableThread;
 import ar.edu.itba.pod.time.TimeMappers;
 
 import com.google.common.base.Preconditions;
@@ -61,6 +63,25 @@ public class Host {
 		registry.bind(Node.AGENTS_BALANCER, agentsBalancer);
 		registry.bind(Node.AGENTS_TRANSFER, agentsTransfer);
 		
+		
+		Thread checkCoord = new CleanableThread("checkCoord") {
+			public void run(){
+				try {
+					Thread.sleep(5000);
+				} catch (InterruptedException e1) {
+					e1.printStackTrace();
+				}
+				if(agentsBalancer.getCoordinator()==null){
+					try {
+						agentsBalancer.bullyElection(node, System.currentTimeMillis());
+					} catch (RemoteException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+			
+		};
+		//checkCoord.start();
 		
 		Thread checkConnectedNodes = new Thread(){
 			public void run() {
@@ -185,5 +206,37 @@ public class Host {
 	
 	public ClusterSimulation getSimulation() {
 		return simulation;
+	}
+	
+	public AgentsBalancer getAgentsBalancerFor(NodeInformation node){
+		Registry registry;
+		AgentsBalancer agentsBalancer=null;
+		try {
+			registry = LocateRegistry.getRegistry(node.host(), node.port());
+			agentsBalancer = (AgentsBalancer)registry.lookup(Node.AGENTS_BALANCER);
+		} catch (AccessException e) {
+			e.printStackTrace();
+		} catch (RemoteException e) {
+			e.printStackTrace();
+		} catch (NotBoundException e) {
+			e.printStackTrace();
+		}
+		return agentsBalancer;
+	}
+	
+	public AgentsTransfer getAgentsTransferFor(NodeInformation node){
+		Registry registry;
+		AgentsTransfer agentsTransfer=null;
+		try {
+			registry = LocateRegistry.getRegistry(node.host(), node.port());
+			agentsTransfer = (AgentsTransfer)registry.lookup(Node.AGENTS_TRANSFER);
+		} catch (AccessException e) {
+			e.printStackTrace();
+		} catch (RemoteException e) {
+			e.printStackTrace();
+		} catch (NotBoundException e) {
+			e.printStackTrace();
+		}
+		return agentsTransfer;
 	}
 }

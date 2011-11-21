@@ -7,6 +7,7 @@ import java.util.List;
 
 import ar.edu.itba.balance.api.AgentsTransfer;
 import ar.edu.itba.balance.api.NodeAgent;
+import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.pod.agent.runner.Agent;
 import ar.edu.itba.pod.legajo48421.node.api.Host;
 
@@ -29,9 +30,10 @@ public class AgentsTransferImpl implements AgentsTransfer{
 	@Override
 	public void runAgentsOnNode(List<NodeAgent> agents) throws RemoteException {
 		Preconditions.checkNotNull(agents, "Agents can not be null");
-			for(NodeAgent agent : agents)
+			for(NodeAgent agent : agents){
 				host.getSimulation().addAgent(agent.agent());
-			
+				NodeInformation nodePrev = agent.node();
+			}
 	}
 
 	@Override
