@@ -1,5 +1,10 @@
 package ar.edu.itba.pod.legajo48421.node.api;
 
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.rmi.AlreadyBoundException;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
@@ -7,6 +12,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,17 +41,17 @@ public class Host {
 	private NodeInformation node;
 	private Registry registry;
 	private RemoteEventDispatcher remoteEventDispatcher;
-	private AgentsBalancer agentsBalancer;
+	private AgentsBalancerImpl agentsBalancer;
 	private AgentsTransfer agentsTransfer;
-	private NodeInformation coordinator;
+	//private NodeInformation coordinator;
 	private ExtendedMultiThreadEventDispatcher extendedMultiThreadEventDispatcher;
-	private ClusterSimulation simulation = new ClusterSimulation(TimeMappers.oneSecondEach(Duration.standardHours(6)), this);
+	private ClusterSimulation simulation;
 	private Map<NodeInformation, Integer> nodeCountAgentMap = new HashMap<NodeInformation, Integer>();
-
+	
 	public Host(String host, int port, String id) throws RemoteException, AlreadyBoundException {
 		registry = LocateRegistry.createRegistry(port);
-		node = new NodeInformation(host, port, id);
-		cluster = new ClusterAdministrationImpl(node);
+		node = new NodeInformation(host, port, host+":"+port);
+		cluster = new ClusterAdministrationImpl(this);
 		remoteEventDispatcher = new RemoteEventDispatcherImpl(this); 
 		agentsBalancer = new AgentsBalancerImpl(this);
 		extendedMultiThreadEventDispatcher = new ExtendedMultiThreadEventDispatcher(this);
@@ -71,9 +77,9 @@ public class Host {
 									System.out.println("Node falling down!");
 									try {
 										cluster.disconnectFromGroup(connectedNode);
-										if(connectedNode.equals(coordinator)){
+										if(connectedNode.equals(agentsBalancer.getCoordinator())){
 											System.out.println("Coord is down!");
-											coordinator=null;
+											//coordinator=null;
 											Set<NodeInformation> connectedNodes = cluster.connectedNodes();
 											if(connectedNodes.size()>1){
 												boolean flag=true;
@@ -90,7 +96,7 @@ public class Host {
 																try {
 																	electionBalancer.bullyElection(node, System.currentTimeMillis());
 																	Thread.sleep(Constant.WAIT_FOR_COORDINATOR);
-																	if(coordinator==null){
+																	if(agentsBalancer.getCoordinator()==null){
 																		electionBalancer.bullyCoordinator(node, System.currentTimeMillis());
 																	}
 																} catch (RemoteException e2) {
@@ -149,23 +155,23 @@ public class Host {
 		return remoteEventDispatcher;
 	}
 
-	public synchronized NodeInformation getCoordinator() {
+	/*public NodeInformation getCoordinator() {
 		return coordinator;
 	}
 
-	public synchronized void setCoordinator(NodeInformation coordinator) {
+	public void setCoordinator(NodeInformation coordinator) {
 		this.coordinator = coordinator;
-	}
+	}*/
 	
 	public ExtendedMultiThreadEventDispatcher getExtendedMultiThreadEventDispatcher() {
 		return extendedMultiThreadEventDispatcher;
 	}
 
-	public synchronized boolean isCoordinator(){
+	/*public synchronized boolean isCoordinator(){
 		return node.equals(coordinator);
-	}
+	}*/
 	
-	public AgentsBalancer getAgentsBalancer() {
+	public AgentsBalancerImpl getAgentsBalancer() {
 		return agentsBalancer;
 	}
 
@@ -173,6 +179,10 @@ public class Host {
 		return agentsTransfer;
 	}
 
+	public void setSimulation(ClusterSimulation clusterSimulation){
+		this.simulation = clusterSimulation;
+	}
+	
 	public ClusterSimulation getSimulation() {
 		return simulation;
 	}

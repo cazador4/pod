@@ -8,11 +8,15 @@ import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
+import org.joda.time.DateTime;
 
 import ar.edu.itba.balance.api.AgentsBalancer;
 import ar.edu.itba.balance.api.AgentsTransfer;
@@ -32,6 +36,9 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 	private Map<NodeInformation, Long> elections; //msg elections
 	private Map<NodeInformation, Long> coordinators; //msg coordinators
 	private AtomicBoolean isOk = new AtomicBoolean(true);
+	private List<NodeCountAgents> nodeCountAgentsList;
+	private volatile NodeInformation coord;
+	CountDownLatch coordinatorLock = new CountDownLatch(1);
 
 	public AgentsBalancerImpl(Host host){
 		try {
@@ -43,6 +50,11 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 		myNode = host.getNodeInformation();
 		elections = new ConcurrentHashMap<NodeInformation, Long>();
 		coordinators = new ConcurrentHashMap<NodeInformation, Long>();
+		nodeCountAgentsList = new ArrayList<NodeCountAgents>();
+	}
+
+	public List<NodeCountAgents> getList(){
+		return nodeCountAgentsList;
 	}
 
 	@Override
@@ -51,15 +63,18 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 		if(checkElection(node, timestamp)){
 			//elections.put(node, timestamp);
 			//VEO SI TENGO MAYOR ID QUE EL QUE LLEGA
+			//host.setCoordinator(null);
+			coord=null;
 			if(myNode.id().compareTo(node.id())>0){
 				isOk.set(true);
-				//System.out.println("Hice un ok! al nodo: "+ node);
+
+				System.out.println("Hice un ok! al nodo: "+ node);
 				if(!isOnElection.getAndSet(true)){
 					Thread newElection = new CleanableThread("newElection"){
 						public void run(){
 							try {
-								//System.out.println("Mande una eleccion!");
 								getBalancer(node).bullyOk(myNode);
+								System.out.println("Mande una eleccion!");
 								long timeElection = System.currentTimeMillis();
 								for(final NodeInformation connectedNode : host.getCluster().connectedNodes()){
 									if(!connectedNode.equals(myNode) && !connectedNode.equals(node)){
@@ -70,12 +85,14 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 									Thread.sleep(Constant.WAIT_FOR_COORDINATOR);
 									isOnElection.set(false);
 									if(isOk.get()){
-//										System.out.println("Seteo que el coord soy yo!");
+										System.out.println("Seteo que el coord soy yo!");
 										long timeCoord=System.currentTimeMillis();
 										for(NodeInformation connectedNode2 : host.getCluster().connectedNodes()){
 											getBalancer(connectedNode2).bullyCoordinator(myNode, timeCoord);
 										}
-										host.setCoordinator(myNode);
+										//host.setCoordinator(myNode);
+										coord=myNode;
+										reloadAndBalanceNodeCountAgentsList();
 									}
 								} catch (InterruptedException e) {
 									e.printStackTrace();
@@ -91,26 +108,38 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 				}
 			}
 			else{
-//				System.out.println("Mi nodo es menor");
-				Thread broadcastElection = new CleanableThread("broadcastElection") {
-					public void run(){
-						try {
-//							System.out.println("Hago broadCast de la eleccion del nodo: "+ node + " con tiempo "+ timestamp);
-							for(NodeInformation connectedNode : host.getCluster().connectedNodes()){
-								if(!connectedNode.equals(node) && !connectedNode.equals(myNode)){
-									try{
-										getBalancer(connectedNode).bullyElection(node, timestamp);
-									} catch(RemoteException e1){
-										e1.printStackTrace();
+				if(host.getCluster().connectedNodes().size()==1){
+					long timeCoord=System.currentTimeMillis();
+					bullyCoordinator(myNode, timeCoord);
+					reloadAndBalanceNodeCountAgentsList();
+				}
+				/*if(myNode.id().compareTo(node.id())==0){
+					long timeCoord=System.currentTimeMillis();
+					bullyCoordinator(myNode, timeCoord);
+					reloadAndBalanceNodeCountAgentsList();	
+				}*/
+				else{
+					System.out.println("Mi nodo es menor");
+					Thread broadcastElection = new CleanableThread("broadcastElection") {
+						public void run(){
+							try {
+								//System.out.println("Hago broadCast de la eleccion del nodo: "+ node + " con tiempo "+ timestamp);
+								for(NodeInformation connectedNode : host.getCluster().connectedNodes()){
+									if(!connectedNode.equals(node) && !connectedNode.equals(myNode)){
+										try{
+											getBalancer(connectedNode).bullyElection(node, timestamp);
+										} catch(RemoteException e1){
+											e1.printStackTrace();
+										}
 									}
 								}
+							} catch (RemoteException e) {
+								e.printStackTrace();
 							}
-						} catch (RemoteException e) {
-							e.printStackTrace();
 						}
-					}
-				};
-				broadcastElection.start();
+					};
+					broadcastElection.start();
+				}
 			}
 		}
 	}
@@ -141,6 +170,10 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 		System.out.println("El nodo " + node + " Me hicieron un ok");
 	}
 
+	public AtomicBoolean getIsOk(){
+		return isOk;
+	}
+
 	private synchronized boolean checkElection(NodeInformation node, long timestamp){
 		if(!elections.containsKey(node) || elections.get(node)<timestamp)
 		{
@@ -162,8 +195,11 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 	public void bullyCoordinator(final NodeInformation node, final long timestamp)
 			throws RemoteException {
 		if(checkCoordinator(node, timestamp)){
-			host.setCoordinator(node);
-//			System.out.println("El coordinador es: " + node +" en el tiempo: " + timestamp);
+			//host.setCoordinator(node);
+			coord=node;
+			coordinatorLock.countDown(); 
+			isOnElection.set(false);
+			System.out.println("El coordinador es: " + node +" en el tiempo: " + timestamp);
 			Thread newCoordinator = new CleanableThread("newCoordinator") {
 				public void run(){
 					try {
@@ -188,85 +224,256 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 	@Override
 	public void shutdown(List<NodeAgent> agents) throws RemoteException,
 	NotCoordinatorException {
-		if(host.isCoordinator()){
-			//BALANCEO
-		}
-		else{
-			NodeInformation coord = host.getCoordinator();
-			if(coord!=null){
-				Registry reg = LocateRegistry.getRegistry(coord.host(), coord.port());
-				AgentsBalancer agentsBalancer;
-				try {
-					agentsBalancer = (AgentsBalancer)reg.lookup(Node.AGENTS_BALANCER);
-					agentsBalancer.shutdown(agents);
-				} catch (NotBoundException e) {
-					e.printStackTrace();
-				}
+		if(getCoordinator().equals(myNode)){
+			NodeAgent nodeAgent = agents.get(0);
+			NodeInformation nodeToShutdown = nodeAgent.node();
+			nodeCountAgentsList.remove(new NodeCountAgents(nodeToShutdown, agents.size()));
+			NodeInformation nodeToAdd = nodeCountAgentsList.get(0).nodeInformation;
+			nodeCountAgentsList.get(0).setCountAgents(agents.size()+ nodeCountAgentsList.get(0).countAgents);
+			Registry registry = LocateRegistry.getRegistry(nodeToAdd.host(), nodeToAdd.port());
+			AgentsTransfer agentsTransfer;
+			try {
+				agentsTransfer = (AgentsTransfer)registry.lookup(Node.AGENTS_TRANSFER);
+				agentsTransfer.runAgentsOnNode(agents);
+			} catch (NotBoundException e) {
+				e.printStackTrace();
 			}
+			try {
+				host.getCluster().disconnectFromGroup(nodeToShutdown);
+				host.getAgentsBalancer().getCoordinator();
+				reloadAndBalanceNodeCountAgentsList();
+			} catch (NotBoundException e) {
+				e.printStackTrace();
+			}
+			
 		}
-		
+		else
+			throw new NotCoordinatorException(host.getNodeInformation());
 	}
 
 	@Override
 	public void addAgentToCluster(NodeAgent agent) throws RemoteException,
 	NotCoordinatorException {
-		if(host.isCoordinator()){
-			
-			Set<NodeInformation> nodes = host.getCluster().connectedNodes();
-			int cantNodes = nodes.size();
-			List<NodeAgent> list = new ArrayList<NodeAgent>();
-			list.add(agent);
-			if(cantNodes==1){
-				list.add(agent);
-				host.getAgentsTransfer().runAgentsOnNode(list);
-			}
-			else{
-				List<NodeInformation> lista = new ArrayList<NodeInformation>();
-				lista.addAll(nodes);
-				lista.remove(host.getNodeInformation());
-				Registry regMore = LocateRegistry.getRegistry(lista.get(0).host(), lista.get(0).port());
-				AgentsTransfer agentMore;
+		if(getCoordinator().equals(myNode)){
+			Collections.sort(nodeCountAgentsList);
+			if(nodeCountAgentsList.isEmpty()){
+				List<NodeAgent> result = new ArrayList<NodeAgent>();
+				result.add(agent);
+				host.getAgentsTransfer().runAgentsOnNode(result);
+			}else{
+				Collections.sort(nodeCountAgentsList);
+				NodeCountAgents nodeCountAgent = nodeCountAgentsList.get(0);
+				Registry registry = LocateRegistry.getRegistry(nodeCountAgent.getNodeInformation().host(), nodeCountAgent.getNodeInformation().port());
 				try {
-					agentMore = (AgentsTransfer)regMore.lookup(Node.AGENTS_TRANSFER);
-					agentMore.runAgentsOnNode(list);
+					AgentsTransfer agentsTransfer = (AgentsTransfer)registry.lookup(Node.AGENTS_TRANSFER);
+					List<NodeAgent> result = new ArrayList<NodeAgent>();
+					result.add(agent);
+					agentsTransfer.runAgentsOnNode(result);
+					nodeCountAgent.addAgent();
+					Collections.sort(nodeCountAgentsList);
 				} catch (NotBoundException e) {
 					e.printStackTrace();
 				}
-				//System.out.println(lista);
-				/*for(int i=0; i<cantNodes;i++){
-					//System.out.println(host.getNodeInformation());
-					//if(!list.get(i).equals(host.getNodeInformation())){
-						System.out.println(lista.get(i).port());
-						Registry regMore = LocateRegistry.getRegistry(lista.get(1).host(), lista.get(1).port());
-						AgentsTransfer agentMore;
-						try {
-							agentMore = (AgentsTransfer)regMore.lookup(Node.AGENTS_TRANSFER);
-							agentMore.runAgentsOnNode(list);
-						} catch (NotBoundException e) {
-							e.printStackTrace();
-						}
-					}*/
-					/*if(i<cantNodes){
-						Registry regLess = LocateRegistry.getRegistry(list.get(i).host(), list.get(i).port());
-						Registry regMore = LocateRegistry.getRegistry(list.get(i).host(), list.get(i).port());
-						try {
-							AgentsTransfer agentLess = (AgentsTransfer)regLess.lookup(Node.AGENTS_TRANSFER);
-							AgentsTransfer agentMore = (AgentsTransfer)regMore.lookup(Node.AGENTS_TRANSFER);
-							if(agentLess.getNumberOfAgents()>agentMore.getNumberOfAgents()){
-								//agentMore.runAgentsOnNode(agents)
-							}
-							
-						} catch (NotBoundException e) {
-							e.printStackTrace();
-						}
-					}
-					*/
-				//}
 			}
-				
 		}
 		else
 			throw new NotCoordinatorException(host.getNodeInformation());
+	}
+
+	public NodeInformation getCoordinator(){
+		NodeInformation nodeToReturn=null;
+		if (coord != null) {
+			nodeToReturn = coord;
+		} else {
+			while(isOnElection.get()) {
+				try {
+					isOnElection.set(coordinatorLock.await(5000, TimeUnit.MILLISECONDS));
+					if (isOnElection.get()) {
+						bullyElection(myNode, DateTime.now().getMillis());
+					} else {
+						coordinatorLock = new CountDownLatch(1);
+						nodeToReturn = coord;
+					}
+				} catch (InterruptedException e) {
+					//TODO
+				} catch (RemoteException e) {
+				}
+			}
+		}
+		return nodeToReturn;
+	}
+
+
+	private Thread reloadThread;
+
+	public void reloadAndBalanceNodeCountAgentsList(){
+		reloadThread = new CleanableThread("reloadThread") {
+			public void run(){
+				System.out.println("starting balance agents...");
+				nodeCountAgentsList.clear();
+				try {
+					for(NodeInformation connectedNode : host.getCluster().connectedNodes()){
+						Registry registry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
+						AgentsTransfer agentsTransfer = (AgentsTransfer)registry.lookup(Node.AGENTS_TRANSFER);
+						NodeCountAgents nodeCountAgents = new NodeCountAgents(connectedNode, agentsTransfer.getNumberOfAgents());
+						nodeCountAgentsList.add(nodeCountAgents);
+					}
+					balance(nodeCountAgentsList);
+					balanceInNodes();
+				} catch (AccessException e) {
+					e.printStackTrace();
+				} catch (RemoteException e) {
+					e.printStackTrace();
+				} catch (NotBoundException e) {
+					e.printStackTrace();
+				}
+			}
+
+			private void balanceInNodes() throws RemoteException {
+				List<NodeAgent> nodesToAdd = new ArrayList<NodeAgent>();
+				for(NodeCountAgents nodeCountAgent : nodeCountAgentsList){
+					Registry registry = LocateRegistry.getRegistry(nodeCountAgent.getNodeInformation().host(), nodeCountAgent.getNodeInformation().port());
+					try {
+						AgentsTransfer agentsTransfer = (AgentsTransfer)registry.lookup(Node.AGENTS_TRANSFER);
+						int diff = agentsTransfer.getNumberOfAgents()-nodeCountAgent.countAgents;
+						if(diff > 0){
+							nodesToAdd.addAll(agentsTransfer.stopAndGet(diff));
+						}
+					} catch (NotBoundException e) {
+						e.printStackTrace();
+					}
+				}
+				//Add agents to every node
+				for(NodeCountAgents nodeCountAgent : nodeCountAgentsList){
+					Registry registry = LocateRegistry.getRegistry(nodeCountAgent.getNodeInformation().host(), nodeCountAgent.getNodeInformation().port());
+					try {
+						AgentsTransfer agentsTransfer = (AgentsTransfer)registry.lookup(Node.AGENTS_TRANSFER);
+						int diff = agentsTransfer.getNumberOfAgents()-nodeCountAgent.countAgents;
+						if(diff < 0){
+							List<NodeAgent> result = new ArrayList<NodeAgent>();
+							for(int i=0; i<(diff*-1); i++)
+								result.add(nodesToAdd.get(i));
+							agentsTransfer.runAgentsOnNode(result);
+						}
+					} catch (NotBoundException e) {
+						e.printStackTrace();
+					}
+				}				
+			}
+
+			public void balance(List<NodeCountAgents> nodeCountAgentsList){
+				Comparator<NodeCountAgents> comparator = Collections.reverseOrder();
+				Collections.sort(nodeCountAgentsList, comparator);
+
+				boolean condition=false;
+				int cantFirst = nodeCountAgentsList.get(0).getCountAgents();
+				int cantLast = nodeCountAgentsList.get(nodeCountAgentsList.size()-1).getCountAgents();
+				int diff = cantFirst-cantLast;
+				if(diff>1){
+					condition=true;
+				}
+				while(condition){
+					int newFirst = cantFirst-diff/2;
+					int newLast = cantLast+diff/2;
+					nodeCountAgentsList.get(0).setCountAgents(newFirst);
+					nodeCountAgentsList.get(nodeCountAgentsList.size()-1).setCountAgents(newLast);
+					Collections.sort(nodeCountAgentsList, comparator);
+					cantFirst = nodeCountAgentsList.get(0).getCountAgents();
+					cantLast = nodeCountAgentsList.get(nodeCountAgentsList.size()-1).getCountAgents();
+					diff = cantFirst-cantLast;
+					if(diff>1)
+						condition=true;
+					else
+						condition=false;
+				}
+			}
+		};
+		reloadThread.start();
+	}
+
+	private class NodeCountAgents implements Comparable<NodeCountAgents>{
+		private int countAgents;
+		private NodeInformation nodeInformation;
+
+		public NodeCountAgents(NodeInformation nodeInformation, int countAgent){
+			this.nodeInformation = nodeInformation;
+			this.countAgents = countAgent;
+		}
+
+		public NodeInformation getNodeInformation(){
+			return nodeInformation;
+		}
+
+		public int getCountAgents(){
+			return countAgents;
+		}
+
+		public void setCountAgents(int countAgents){
+			this.countAgents = countAgents;
+		}
+
+		public void addAgent(){
+			countAgents++;
+		}
+
+		@Override
+		public int compareTo(NodeCountAgents arg0) {
+			if(arg0!=null){
+				if(countAgents>arg0.countAgents)
+					return 1;
+				else{
+					if(countAgents==arg0.countAgents)
+						return 0;
+					else
+						return -1;
+				}		
+			}
+			return 0;
+		}
+
+		public String toString(){
+			return nodeInformation.toString() + " " + countAgents;
+		}
+
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + getOuterType().hashCode();
+			result = prime * result + countAgents;
+			result = prime
+					* result
+					+ ((nodeInformation == null) ? 0 : nodeInformation
+							.hashCode());
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			NodeCountAgents other = (NodeCountAgents) obj;
+			if (!getOuterType().equals(other.getOuterType()))
+				return false;
+			if (countAgents != other.countAgents)
+				return false;
+			if (nodeInformation == null) {
+				if (other.nodeInformation != null)
+					return false;
+			} else if (!nodeInformation.equals(other.nodeInformation))
+				return false;
+			return true;
+		}
+
+		private AgentsBalancerImpl getOuterType() {
+			return AgentsBalancerImpl.this;
+		}
+
+
 	}
 
 }

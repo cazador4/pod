@@ -132,6 +132,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 	@Override
 	public boolean publish(final EventInformation event) throws RemoteException,
 	InterruptedException {
+		//System.out.println("ASDASDADSASD " + event.nodeId());
 		if(!queue.contains(event) && !processingEvents.containsKey(event)){
 			queue.add(event);
 			/*Thread newPublish = new CleanableThread("newPublish") {
