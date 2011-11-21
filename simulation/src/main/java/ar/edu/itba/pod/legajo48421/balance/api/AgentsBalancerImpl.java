@@ -219,7 +219,7 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 			}
 		}
 		else
-			throw new NotCoordinatorException(host.getNodeInformation());
+			throw new NotCoordinatorException(host.getAgentsBalancer().getCoordinator());
 	}
 
 	@Override

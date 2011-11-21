@@ -8,10 +8,10 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 
-import ar.edu.itba.balance.api.AgentsBalancer;
 import ar.edu.itba.node.Node;
 import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.ClusterAdministration;
+import ar.edu.itba.pod.thread.CleanableThread;
 
 import com.google.common.base.Preconditions;
 
@@ -57,22 +57,35 @@ public class ClusterAdministrationImpl implements ClusterAdministration{
 		ClusterAdministration connectedCluster = (ClusterAdministration)connectedRegistry.lookup(Node.CLUSTER_COMUNICATION);
 		group = connectedCluster.getGroupId();
 		connectedNodes.addAll(connectedCluster.addNewNode(this.host.getNodeInformation()));
-		
+
 	}
 
 	@Override
-	public void disconnectFromGroup(NodeInformation node)
+	public void disconnectFromGroup(final NodeInformation node)
 			throws RemoteException, NotBoundException {
 		//Preconditions.checkNotNull(group,"Group not exist");
 		if(connectedNodes.contains(node)){
 			connectedNodes.remove(node);
-			for(NodeInformation connectedNode : connectedNodes){
-				//if(!connectedNode.equals(this.node)){
-					Registry registry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
-					ClusterAdministration connectedCluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
-					connectedCluster.disconnectFromGroup(node);
-				//}
-			}
+			Thread disconnectBroadCast = new CleanableThread("disconnectBroadcast") {
+				public void run(){
+					for(NodeInformation connectedNode : connectedNodes){
+						//if(!connectedNode.equals(this.node)){
+						Registry registry;
+						try {
+							registry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
+							ClusterAdministration connectedCluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
+							connectedCluster.disconnectFromGroup(node);
+						} catch (RemoteException e) {
+							e.printStackTrace();
+						} catch (NotBoundException e) {
+							e.printStackTrace();
+						}
+						
+						//}
+					}
+				}
+			};
+			disconnectBroadCast.run();
 			if(node.equals(host.getAgentsBalancer().getCoordinator())){
 				host.getAgentsBalancer().bullyElection(host.getNodeInformation(), System.currentTimeMillis());
 				/*if(connectedNodes.size()>0){

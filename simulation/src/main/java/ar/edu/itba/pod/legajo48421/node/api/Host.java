@@ -1,10 +1,5 @@
 package ar.edu.itba.pod.legajo48421.node.api;
 
-import java.net.Inet4Address;
-import java.net.Inet6Address;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.rmi.AccessException;
 import java.rmi.AlreadyBoundException;
 import java.rmi.NotBoundException;
@@ -13,13 +8,8 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-
-import org.joda.time.Duration;
 
 import ar.edu.itba.balance.api.AgentsBalancer;
 import ar.edu.itba.balance.api.AgentsTransfer;
@@ -33,7 +23,6 @@ import ar.edu.itba.pod.legajo48421.event.RemoteEventDispatcherImpl;
 import ar.edu.itba.pod.legajo48421.multithread.ClusterSimulation;
 import ar.edu.itba.pod.legajo48421.multithread.ExtendedMultiThreadEventDispatcher;
 import ar.edu.itba.pod.thread.CleanableThread;
-import ar.edu.itba.pod.time.TimeMappers;
 
 import com.google.common.base.Preconditions;
 
@@ -45,11 +34,9 @@ public class Host {
 	private RemoteEventDispatcher remoteEventDispatcher;
 	private AgentsBalancerImpl agentsBalancer;
 	private AgentsTransfer agentsTransfer;
-	//private NodeInformation coordinator;
 	private ExtendedMultiThreadEventDispatcher extendedMultiThreadEventDispatcher;
 	private ClusterSimulation simulation;
-	private Map<NodeInformation, Integer> nodeCountAgentMap = new HashMap<NodeInformation, Integer>();
-	
+
 	public Host(String host, int port, String id) throws RemoteException, AlreadyBoundException {
 		registry = LocateRegistry.createRegistry(port);
 		node = new NodeInformation(host, port, host+":"+port);
@@ -62,8 +49,8 @@ public class Host {
 		registry.bind(Node.DISTRIBUTED_EVENT_DISPATCHER, remoteEventDispatcher);
 		registry.bind(Node.AGENTS_BALANCER, agentsBalancer);
 		registry.bind(Node.AGENTS_TRANSFER, agentsTransfer);
-		
-		
+
+
 		Thread checkCoord = new CleanableThread("checkCoord") {
 			public void run(){
 				try {
@@ -71,18 +58,20 @@ public class Host {
 				} catch (InterruptedException e1) {
 					e1.printStackTrace();
 				}
-				if(agentsBalancer.getCoordinator()==null){
-					try {
-						agentsBalancer.bullyElection(node, System.currentTimeMillis());
-					} catch (RemoteException e) {
-						e.printStackTrace();
+				if(agentsBalancer.getCoordinator()!=null){
+					if(getAgentsBalancerFor(agentsBalancer.getCoordinator())==null){
+						try {
+							agentsBalancer.bullyElection(node, System.currentTimeMillis());
+						} catch (RemoteException e) {
+							e.printStackTrace();
+						}
 					}
 				}
 			}
-			
+
 		};
-		//checkCoord.start();
-		
+		checkCoord.start();
+
 		Thread checkConnectedNodes = new Thread(){
 			public void run() {
 				while(true){
@@ -109,7 +98,6 @@ public class Host {
 												while(flag){
 													if(list.size()>0){
 														NodeInformation nodoToSendElection = list.remove(0);
-													//if(!node.equals(nodoToSendElection)){
 														Registry electionRegistry = LocateRegistry.getRegistry(nodoToSendElection.host(), nodoToSendElection.port());
 														final AgentsBalancer electionBalancer = (AgentsBalancer) electionRegistry.lookup(Node.AGENTS_BALANCER);
 														Thread newElection = new Thread(){
@@ -176,22 +164,10 @@ public class Host {
 		return remoteEventDispatcher;
 	}
 
-	/*public NodeInformation getCoordinator() {
-		return coordinator;
-	}
-
-	public void setCoordinator(NodeInformation coordinator) {
-		this.coordinator = coordinator;
-	}*/
-	
 	public ExtendedMultiThreadEventDispatcher getExtendedMultiThreadEventDispatcher() {
 		return extendedMultiThreadEventDispatcher;
 	}
 
-	/*public synchronized boolean isCoordinator(){
-		return node.equals(coordinator);
-	}*/
-	
 	public AgentsBalancerImpl getAgentsBalancer() {
 		return agentsBalancer;
 	}
@@ -203,11 +179,11 @@ public class Host {
 	public void setSimulation(ClusterSimulation clusterSimulation){
 		this.simulation = clusterSimulation;
 	}
-	
+
 	public ClusterSimulation getSimulation() {
 		return simulation;
 	}
-	
+
 	public AgentsBalancer getAgentsBalancerFor(NodeInformation node){
 		Registry registry;
 		AgentsBalancer agentsBalancer=null;
@@ -223,7 +199,7 @@ public class Host {
 		}
 		return agentsBalancer;
 	}
-	
+
 	public AgentsTransfer getAgentsTransferFor(NodeInformation node){
 		Registry registry;
 		AgentsTransfer agentsTransfer=null;
