@@ -13,6 +13,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import ar.edu.itba.event.EventInformation;
 import ar.edu.itba.event.RemoteEventDispatcher;
@@ -20,7 +21,6 @@ import ar.edu.itba.node.Node;
 import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.ClusterAdministration;
 import ar.edu.itba.pod.agent.runner.Agent;
-import ar.edu.itba.pod.legajo48421.multithread.MsgError;
 import ar.edu.itba.pod.legajo48421.node.api.Host;
 import ar.edu.itba.pod.thread.CleanableThread;
 
@@ -31,7 +31,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 	private final Host host;
 	ConcurrentMap<EventInformation, Long> processingEvents;
 	ConcurrentMap<NodeInformation, Long> lastTimeSendEvent;
-
+	private ReentrantReadWriteLock lock;
 
 
 	public RemoteEventDispatcherImpl(final Host host){
@@ -40,6 +40,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 		this.host = host;
 		processingEvents = new ConcurrentHashMap<EventInformation, Long>(); 
 		lastTimeSendEvent = new ConcurrentHashMap<NodeInformation, Long>();
+		lock = new ReentrantReadWriteLock(true);
 		try {
 			UnicastRemoteObject.exportObject(this, 0);
 		} catch (RemoteException e1) {
@@ -53,11 +54,12 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 					try {
 						eventInformation = queue.take();
 						processingEvents.put((EventInformation)eventInformation, System.currentTimeMillis());
+						
 						host.getExtendedMultiThreadEventDispatcher().publishIntern(eventInformation.source(), eventInformation.event());
 						Registry registry = LocateRegistry.getRegistry(host.getNodeInformation().host(), host.getNodeInformation().port());
 						ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
 						int countFalse = 0;
-						//TODO ver cuantos false recibo del publish para no seguir mandando!
+						//ver cuantos false recibo del publish para no seguir mandando!
 						Set<NodeInformation> connectedNodes = cluster.connectedNodes();
 						for(NodeInformation connectedNode : connectedNodes){
 							if(countFalse<=connectedNodes.size()/2){
@@ -72,11 +74,11 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 							}
 						}
 					} catch (RemoteException e) {
-						e.printStackTrace();
+						//e.printStackTrace();
 					} catch (NotBoundException e) {
-						e.printStackTrace();
+						//e.printStackTrace();
 					} catch (InterruptedException e) {
-						e.printStackTrace();
+						//e.printStackTrace();
 					}
 				}
 			}
@@ -88,6 +90,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 			public void run() {
 				while(true){
 					Registry registry;
+					NodeInformation connectedNode=null;
 					try {
 						Thread.sleep(5000);
 						registry = LocateRegistry.getRegistry(host.getNodeInformation().host(), host.getNodeInformation().port());
@@ -96,19 +99,30 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 						Set<NodeInformation> nodes = cluster.connectedNodes();
 						if(nodes.size()>1){
 							int position = random.nextInt(nodes.size()-1);
-							NodeInformation connectedNode = (NodeInformation)nodes.toArray()[position];
+							connectedNode = (NodeInformation)nodes.toArray()[position];
 							if(!connectedNode.equals(host.getNodeInformation())){
 								registry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
 								RemoteEventDispatcher connectedEventDispatcher = (RemoteEventDispatcher)registry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
 								Set<EventInformation> newEvents = connectedEventDispatcher.newEventsFor(host.getNodeInformation());
 								queue.addAll(newEvents);
-								//System.out.println("NEW EVENTS: " + newEvents);
 							}
 						}
 					} catch (RemoteException e) {
-						System.out.println(MsgError.CONNECTION_ERROR	);
+						try {
+							host.getCluster().disconnectFromGroup(connectedNode);
+						} catch (RemoteException e1) {
+							e1.printStackTrace();
+						} catch (NotBoundException e1) {
+							e1.printStackTrace();
+						}
 					} catch (NotBoundException e) {
-						e.printStackTrace();
+						try {
+							host.getCluster().disconnectFromGroup(connectedNode);
+						} catch (RemoteException e1) {
+							e1.printStackTrace();
+						} catch (NotBoundException e1) {
+							e1.printStackTrace();
+						}
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
@@ -117,16 +131,36 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 			}
 		};
 		getNewEvent.start();
+		
+		Thread cleanProcessingEvents = new CleanableThread("cleanProcessingEvents") {
+			public void run(){
+				while(true){
+					try {
+						Thread.sleep(10000);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					processingEvents.clear();
+				}
+			}
+		};
+		cleanProcessingEvents.start();
 	}
 
 	@Override
 	public boolean publish(final EventInformation event) throws RemoteException,
 	InterruptedException {
+
+		boolean result = false;
+		
+		getLock().readLock().lock();
 		if(!queue.contains(event) && !processingEvents.containsKey(event)){
 			queue.add(event);
-			return true;
+			result = true;
 		}
-		return false;
+		getLock().readLock().unlock();
+		
+		return result;
 	}
 
 	private Set<EventInformation> findInQueue(String nodeId, long timestamp) {
@@ -139,6 +173,10 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 		return result;
 	}
 
+	public synchronized ReentrantReadWriteLock getLock(){
+		return lock;
+	}
+	
 	@Override
 	public Set<EventInformation> newEventsFor(NodeInformation nodeInformation)
 			throws RemoteException {
@@ -148,10 +186,14 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 		return findInQueue(nodeInformation.id(), timestamp);
 	}
 
+	public BlockingQueue<EventInformation> getPendingEvents(){
+		return queue;
+	}
+	
 	@Override
 	public BlockingQueue<Object> moveQueueFor(Agent agent)
 			throws RemoteException {
-		return null;
+		return host.getExtendedMultiThreadEventDispatcher().deregister(agent);
 	}
 
 }

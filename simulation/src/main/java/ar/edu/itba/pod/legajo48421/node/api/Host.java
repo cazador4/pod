@@ -13,10 +13,14 @@ import java.util.Set;
 
 import ar.edu.itba.balance.api.AgentsBalancer;
 import ar.edu.itba.balance.api.AgentsTransfer;
+import ar.edu.itba.balance.api.NodeAgent;
+import ar.edu.itba.balance.api.NotCoordinatorException;
 import ar.edu.itba.event.RemoteEventDispatcher;
 import ar.edu.itba.node.Node;
 import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.ClusterAdministration;
+import ar.edu.itba.node.api.StatisticReports;
+import ar.edu.itba.pod.agent.runner.Agent;
 import ar.edu.itba.pod.legajo48421.balance.api.AgentsBalancerImpl;
 import ar.edu.itba.pod.legajo48421.balance.api.AgentsTransferImpl;
 import ar.edu.itba.pod.legajo48421.event.RemoteEventDispatcherImpl;
@@ -31,12 +35,13 @@ public class Host {
 	private ClusterAdministration cluster;
 	private NodeInformation node;
 	private Registry registry;
-	private RemoteEventDispatcher remoteEventDispatcher;
+	private RemoteEventDispatcherImpl remoteEventDispatcher;
 	private AgentsBalancerImpl agentsBalancer;
 	private AgentsTransfer agentsTransfer;
 	private ExtendedMultiThreadEventDispatcher extendedMultiThreadEventDispatcher;
 	private ClusterSimulation simulation;
-
+	private StatisticsReportsImpl statisticsReports;
+	
 	public Host(String host, int port, String id) throws RemoteException, AlreadyBoundException {
 		registry = LocateRegistry.createRegistry(port);
 		node = new NodeInformation(host, port, host+":"+port);
@@ -45,10 +50,13 @@ public class Host {
 		agentsBalancer = new AgentsBalancerImpl(this);
 		extendedMultiThreadEventDispatcher = new ExtendedMultiThreadEventDispatcher(this);
 		agentsTransfer = new AgentsTransferImpl(this);
+		statisticsReports = new StatisticsReportsImpl(this);
+		
 		registry.bind(Node.CLUSTER_COMUNICATION, cluster);
 		registry.bind(Node.DISTRIBUTED_EVENT_DISPATCHER, remoteEventDispatcher);
 		registry.bind(Node.AGENTS_BALANCER, agentsBalancer);
 		registry.bind(Node.AGENTS_TRANSFER, agentsTransfer);
+		registry.bind(Node.STATISTIC_REPORTS, statisticsReports);
 
 
 		Thread checkCoord = new CleanableThread("checkCoord") {
@@ -160,7 +168,7 @@ public class Host {
 		return node;
 	}
 
-	public RemoteEventDispatcher getRemoteEventDispatcher(){
+	public RemoteEventDispatcherImpl getRemoteEventDispatcher(){
 		return remoteEventDispatcher;
 	}
 
@@ -191,15 +199,59 @@ public class Host {
 			registry = LocateRegistry.getRegistry(node.host(), node.port());
 			agentsBalancer = (AgentsBalancer)registry.lookup(Node.AGENTS_BALANCER);
 		} catch (AccessException e) {
-			e.printStackTrace();
+			//e.printStackTrace();
+			try {
+				this.cluster.disconnectFromGroup(node);
+			} catch (RemoteException e1) {
+				e1.printStackTrace();
+			} catch (NotBoundException e1) {
+				e1.printStackTrace();
+			}
 		} catch (RemoteException e) {
-			e.printStackTrace();
+			//e.printStackTrace();
+			try {
+				this.cluster.disconnectFromGroup(node);
+			} catch (RemoteException e1) {
+				e1.printStackTrace();
+			} catch (NotBoundException e1) {
+				e1.printStackTrace();
+			}
 		} catch (NotBoundException e) {
 			e.printStackTrace();
 		}
 		return agentsBalancer;
 	}
 
+	public RemoteEventDispatcher getRemoteEventDispatcherFor(NodeInformation node){
+		Registry registry;
+		RemoteEventDispatcher remoteEventDispatcher=null;
+		try {
+			registry = LocateRegistry.getRegistry(node.host(), node.port());
+			remoteEventDispatcher = (RemoteEventDispatcher)registry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
+		} catch (AccessException e) {
+			e.printStackTrace();
+		} catch (RemoteException e) {
+			//e.printStackTrace();
+			try {
+				this.cluster.disconnectFromGroup(node);
+			} catch (RemoteException e1) {
+				e1.printStackTrace();
+			} catch (NotBoundException e1) {
+				e1.printStackTrace();
+			}
+		} catch (NotBoundException e) {
+			//e.printStackTrace();
+			try {
+				this.cluster.disconnectFromGroup(node);
+			} catch (RemoteException e1) {
+				e1.printStackTrace();
+			} catch (NotBoundException e1) {
+				e1.printStackTrace();
+			}
+		}
+		return remoteEventDispatcher;
+	}
+	
 	public AgentsTransfer getAgentsTransferFor(NodeInformation node){
 		Registry registry;
 		AgentsTransfer agentsTransfer=null;
@@ -209,10 +261,73 @@ public class Host {
 		} catch (AccessException e) {
 			e.printStackTrace();
 		} catch (RemoteException e) {
-			e.printStackTrace();
+			//e.printStackTrace();
+			try {
+				this.cluster.disconnectFromGroup(node);
+			} catch (RemoteException e1) {
+				e1.printStackTrace();
+			} catch (NotBoundException e1) {
+				e1.printStackTrace();
+			}
 		} catch (NotBoundException e) {
-			e.printStackTrace();
+			//e.printStackTrace();
+			try {
+				this.cluster.disconnectFromGroup(node);
+			} catch (RemoteException e1) {
+				e1.printStackTrace();
+			} catch (NotBoundException e1) {
+				e1.printStackTrace();
+			}
 		}
 		return agentsTransfer;
+	}
+	
+	public StatisticReports getStatisticsFor(NodeInformation node){
+		Registry registry;
+		StatisticReports statisticReports=null;
+		try {
+			registry = LocateRegistry.getRegistry(node.host(), node.port());
+			statisticReports = (StatisticReports)registry.lookup(Node.STATISTIC_REPORTS);
+		} catch (AccessException e) {
+			e.printStackTrace();
+		} catch (RemoteException e) {
+			//e.printStackTrace();
+			try {
+				this.cluster.disconnectFromGroup(node);
+			} catch (RemoteException e1) {
+				e1.printStackTrace();
+			} catch (NotBoundException e1) {
+				e1.printStackTrace();
+			}
+		} catch (NotBoundException e) {
+			//e.printStackTrace();
+			try {
+				this.cluster.disconnectFromGroup(node);
+			} catch (RemoteException e1) {
+				e1.printStackTrace();
+			} catch (NotBoundException e1) {
+				e1.printStackTrace();
+			}
+		}
+		return statisticReports;
+	}
+	
+	public StatisticsReportsImpl getStatistics(){
+		return statisticsReports;
+	}
+	
+	public void shutdown() throws RemoteException, NotBoundException, NotCoordinatorException{
+		Registry reg = LocateRegistry.getRegistry(this.getAgentsBalancer().getCoordinator().host(), this.getAgentsBalancer().getCoordinator().port());
+		AgentsBalancer balancer = (AgentsBalancer)reg.lookup(Node.AGENTS_BALANCER);
+		
+		List<NodeAgent> nodeAgentsToMove = new ArrayList<NodeAgent>();
+		for(Agent agent : this.getSimulation().getAgentsRunning()){
+			NodeAgent nodeAgent = new NodeAgent(this.getNodeInformation(), agent);
+			nodeAgentsToMove.add(nodeAgent);
+			
+		}
+		
+		balancer.shutdown(nodeAgentsToMove);
+		System.exit(0);
 	}
 }

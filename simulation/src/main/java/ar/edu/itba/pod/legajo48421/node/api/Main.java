@@ -16,15 +16,19 @@ import org.joda.time.Duration;
 
 import ar.edu.itba.balance.api.AgentsBalancer;
 import ar.edu.itba.balance.api.NodeAgent;
+import ar.edu.itba.balance.api.NotCoordinatorException;
 import ar.edu.itba.event.EventInformation;
 import ar.edu.itba.node.Node;
 import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.ClusterAdministration;
+import ar.edu.itba.node.api.NodeStatistics;
+import ar.edu.itba.pod.agent.market.AgentState;
 import ar.edu.itba.pod.agent.market.Market;
 import ar.edu.itba.pod.agent.market.Producer;
 import ar.edu.itba.pod.agent.market.Resource;
 import ar.edu.itba.pod.agent.runner.Agent;
 import ar.edu.itba.pod.legajo48421.multithread.ClusterSimulation;
+import ar.edu.itba.pod.thread.CleanableThread;
 import ar.edu.itba.pod.time.TimeMapper;
 import ar.edu.itba.pod.time.TimeMappers;
 
@@ -35,20 +39,20 @@ public class Main {
 		if(args.length==3){
 			//CADA NODO TIENE QUE SABER QUIEN ES EL NODO COORDINADOR.
 			try {
-				Host host = new Host(args[0], Integer.valueOf(args[1]), args[2]);
+				final Host host = new Host(args[0], Integer.valueOf(args[1]), args[2]);
 				host.getCluster().createGroup();
 
 				//host.getAgentsBalancer().bullyCoordinator(host.getNodeInformation(), System.currentTimeMillis());
 				host.getAgentsBalancer().bullyElection(host.getNodeInformation(), System.currentTimeMillis());
-				
-				
+
+
 				Resource steel = new Resource("Alloy", "Steel");
 				TimeMapper timeMapper = TimeMappers.oneSecondEach(Duration.standardHours(6));
 				ClusterSimulation node = new ClusterSimulation(timeMapper, host);
 				host.setSimulation(node);
 				//for (int i = 0; i < 1; i++) {
-					//node.add(new Market("steel market", steel));
-				node.add(new Producer("steel consumer1", steel, Duration.standardDays(3), 2));
+				node.add(new Market("steel market", steel));
+				//node.add(new Producer("steel consumer1", steel, Duration.standardDays(3), 2));
 				//}
 				/*try {
 					node.startAndWait(Duration.standardSeconds(5000));
@@ -72,22 +76,22 @@ public class Main {
 							System.out.println("Agentes corriendo aca " + host.getSimulation().agentsRunning());
 							Registry reg = LocateRegistry.getRegistry(host.getAgentsBalancer().getCoordinator().host(), host.getAgentsBalancer().getCoordinator().port());
 							AgentsBalancer balancer = (AgentsBalancer)reg.lookup(Node.AGENTS_BALANCER);
-							
+
 							List<NodeAgent> nodeAgentsToMove = new ArrayList<NodeAgent>();
 							for(Agent agent : host.getSimulation().getAgentsRunning()){
 								NodeAgent nodeAgent = new NodeAgent(host.getNodeInformation(), agent);
 								nodeAgentsToMove.add(nodeAgent);
-								
+
 							}
-							
+
 							balancer.shutdown(nodeAgentsToMove);
 							for(NodeAgent nodeAgent : nodeAgentsToMove)
 								host.getSimulation().remove(nodeAgent.agent());
-							
-							System.out.println("Agentes corriendo aca " + host.getSimulation().agentsRunning());
-							//host.getCluster().disconnectFromGroup(host.getNodeInformation());
-							//System.exit(0);
-							break;
+
+									System.out.println("Agentes corriendo aca " + host.getSimulation().agentsRunning());
+									//host.getCluster().disconnectFromGroup(host.getNodeInformation());
+									//System.exit(0);
+									break;
 						case newevent:
 							Resource resource = new Resource("Alloy", "Steel");
 							NodeAgent nodeAgent = new NodeAgent(host.getNodeInformation(), new Producer("steel mine" + 1, resource, Duration.standardDays(1), 5));
@@ -97,21 +101,72 @@ public class Main {
 							System.out.println("Coordinator is: " + host.getAgentsBalancer().getCoordinator());
 							break;
 						case events:
-							System.out.println("Agentes corriendo aca " + host.getSimulation().agentsRunning());
+							//System.out.println("Agentes corriendo aca " + host.getSimulation().agentsRunning());
+
+							Thread newStatistics = new CleanableThread("newStatistics") {
+								@Override
+								public void run() {
+									while(true){
+										try {
+											Thread.sleep(6000);
+											for(NodeInformation nodeConnected : host.getCluster().connectedNodes()){
+												NodeStatistics nodeStatistics = host.getStatisticsFor(nodeConnected).getNodeStatistics();
+												System.out.println("Node: " + nodeConnected);
+												System.out.println("Count Agents: " + nodeStatistics.getNumberOfAgents());
+												for(AgentState agentState:nodeStatistics.getAgentState()){
+													System.out.println("State: " +  agentState);
+												}
+											}
+										} catch (RemoteException e) {
+											e.printStackTrace();
+										} catch (InterruptedException e) {
+											e.printStackTrace();
+										}
+									}
+
+								}
+
+							};
+							newStatistics.start();
+
+							Thread shutdown = new CleanableThread("shutDown") {
+								@Override
+								public void run() {
+									BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+									try{
+									String s = br.readLine();
+									switch(Integer.valueOf(s)){
+									case 1:
+										host.shutdown();
+										break;
+									}
+									} catch (IOException e){
+									} catch (NotBoundException e) {
+										// TODO Auto-generated catch block
+										//e.printStackTrace();
+									} catch (NotCoordinatorException e) {
+										// TODO Auto-generated catch block
+										//e.printStackTrace();
+									}
+
+								}
+
+							};
+							shutdown.start();
 							node.startAndWait(Duration.standardMinutes(10));
 							break;
 						}
 					} 
 					catch (Exception e) {
-						System.out.println(e.getMessage());
+						//System.out.println(e.getMessage());
 					}
 				}
 			} catch (RemoteException e1) {
-				e1.printStackTrace();
+				//e1.printStackTrace();
 			} catch (NumberFormatException e) {
-				e.printStackTrace();
+				//e.printStackTrace();
 			} catch (AlreadyBoundException e) {
-				e.printStackTrace();
+				//e.printStackTrace();
 			}
 		}
 		//NODE MAIN
@@ -130,14 +185,14 @@ public class Main {
 					final AgentsBalancer agentsBalancerConnected = (AgentsBalancer) connectedRegistry.lookup(Node.AGENTS_BALANCER);
 
 					try {
-//						System.out.println("Envio una eleccion");
+						//						System.out.println("Envio una eleccion");
 						agentsBalancerConnected.bullyElection(host.getNodeInformation(), System.currentTimeMillis());
 						/*Thread.sleep(5000);
 						//System.out.println("Ya termine la eleccion! que paso??");
 						if(host.getAgentsBalancer().getCoordinator()==null){
 							agentsBalancerConnected.bullyCoordinator(host.getNodeInformation(), System.currentTimeMillis());
 							host.setCoordinator(host.getNodeInformation());
-							
+
 						}*/
 					} catch (RemoteException e) {
 						e.printStackTrace();
@@ -199,7 +254,7 @@ public class Main {
 
 	public enum Command
 	{
-		list, close, newevent, events, coord, agents, shutdown;
+		list, close, newevent, events, coord, agents, shutdown, add;
 
 		public static Command toCommand(String str)
 		{

@@ -58,13 +58,10 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 	public void bullyElection(final NodeInformation node, final long timestamp)
 			throws RemoteException {
 		if(checkElection(node, timestamp)){
-			//elections.put(node, timestamp);
 			//VEO SI TENGO MAYOR ID QUE EL QUE LLEGA
-			//host.setCoordinator(null);
 			coord=null;
 			if(myNode.id().compareTo(node.id())>0){
 				isOk.set(true);
-
 				System.out.println("Hice un ok! al nodo: "+ node);
 				if(!isOnElection.getAndSet(true)){
 					Thread newElection = new CleanableThread("newElection"){
@@ -92,7 +89,7 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 										reloadAndBalanceNodeCountAgentsList();
 									}
 								} catch (InterruptedException e) {
-									e.printStackTrace();
+									//e.printStackTrace();
 								}
 							} catch (RemoteException e) {
 							}
@@ -126,12 +123,12 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 										try{
 											host.getAgentsBalancerFor(connectedNode).bullyElection(node, timestamp);
 										} catch(RemoteException e1){
-											e1.printStackTrace();
+											//e1.printStackTrace();
 										}
 									}
 								}
 							} catch (RemoteException e) {
-								e.printStackTrace();
+								//e.printStackTrace();
 							}
 						}
 					};
@@ -144,7 +141,7 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 	@Override
 	public void bullyOk(NodeInformation node) throws RemoteException {
 		isOk.set(false);
-		System.out.println("El nodo " + node + " Me hicieron un ok");
+		//System.out.println("El nodo " + node + " Me hicieron un ok");
 	}
 
 	public AtomicBoolean getIsOk(){
@@ -189,7 +186,7 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 							}
 						}
 					} catch (RemoteException e) {
-						e.printStackTrace();
+						//e.printStackTrace();
 					}
 				}
 			};
@@ -215,7 +212,7 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 				host.getAgentsBalancer().getCoordinator();
 				reloadAndBalanceNodeCountAgentsList();
 			} catch (NotBoundException e) {
-				e.printStackTrace();
+				//e.printStackTrace();
 			}
 		}
 		else
@@ -261,7 +258,6 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 						nodeToReturn = coord;
 					}
 				} catch (InterruptedException e) {
-					//TODO
 				} catch (RemoteException e) {
 				}
 			}
@@ -286,9 +282,9 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 					balance(nodeCountAgentsList);
 					balanceInNodes();
 				} catch (AccessException e) {
-					e.printStackTrace();
+					//e.printStackTrace();
 				} catch (RemoteException e) {
-					e.printStackTrace();
+					//e.printStackTrace();
 				}
 			}
 

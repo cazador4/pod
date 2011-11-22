@@ -44,9 +44,9 @@ public class ClusterSimulation extends LocalSimulation{
 			try {
 				host.getAgentsBalancer().addAgentToCluster(nodeAgent);
 			} catch (RemoteException e) {
-				e.printStackTrace();
+				//e.printStackTrace();
 			} catch (NotCoordinatorException e) {
-				e.printStackTrace();
+				//e.printStackTrace();
 			}
 		}
 		else{
@@ -55,11 +55,24 @@ public class ClusterSimulation extends LocalSimulation{
 				AgentsBalancer agentsBalancer = (AgentsBalancer)registry.lookup(Node.AGENTS_BALANCER);
 				agentsBalancer.addAgentToCluster(nodeAgent);
 			} catch (AccessException e) {
-				e.printStackTrace();
+				//e.printStackTrace();
 			} catch (RemoteException e) {
-				e.printStackTrace();
+				//e.printStackTrace();
+				try {
+					host.getCluster().disconnectFromGroup(coord);
+				} catch (RemoteException e1) {
+					e1.printStackTrace();
+				} catch (NotBoundException e1) {
+					e1.printStackTrace();
+				}
 			} catch (NotBoundException e) {
-				e.printStackTrace();
+				try {
+					host.getCluster().disconnectFromGroup(coord);
+				} catch (RemoteException e1) {
+					e1.printStackTrace();
+				} catch (NotBoundException e1) {
+					e1.printStackTrace();
+				}
 			} catch (NotCoordinatorException e) {
 				e.printStackTrace();
 			}
