@@ -48,10 +48,10 @@ public class SimulationApp implements Runnable {
 		final Host host;
 		try {
 			host = new Host(args[3], Integer.valueOf(args[4]), args[2]);
-
-			host.connect(args[0], Integer.valueOf(args[1]));
 			final ClusterSimulation node = new ClusterSimulation(timeMapper, host);
 			host.setSimulation(node);
+			host.connect(args[0], Integer.valueOf(args[1]));
+			
 			Registry connectedRegistry = LocateRegistry.getRegistry(args[0], Integer.valueOf(args[1]));
 			final AgentsBalancer agentsBalancerConnected = (AgentsBalancer) connectedRegistry.lookup(Node.AGENTS_BALANCER);
 
