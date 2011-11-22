@@ -11,6 +11,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
+import org.joda.time.Duration;
+
 import ar.edu.itba.balance.api.AgentsBalancer;
 import ar.edu.itba.balance.api.AgentsTransfer;
 import ar.edu.itba.balance.api.NodeAgent;
@@ -27,6 +29,8 @@ import ar.edu.itba.pod.legajo48421.event.RemoteEventDispatcherImpl;
 import ar.edu.itba.pod.legajo48421.multithread.ClusterSimulation;
 import ar.edu.itba.pod.legajo48421.multithread.ExtendedMultiThreadEventDispatcher;
 import ar.edu.itba.pod.thread.CleanableThread;
+import ar.edu.itba.pod.time.TimeMapper;
+import ar.edu.itba.pod.time.TimeMappers;
 
 import com.google.common.base.Preconditions;
 
@@ -51,6 +55,7 @@ public class Host {
 		extendedMultiThreadEventDispatcher = new ExtendedMultiThreadEventDispatcher(this);
 		agentsTransfer = new AgentsTransferImpl(this);
 		statisticsReports = new StatisticsReportsImpl(this);
+		simulation = new ClusterSimulation(TimeMappers.oneSecondEach(Duration.standardHours(6)), this);
 		
 		registry.bind(Node.CLUSTER_COMUNICATION, cluster);
 		registry.bind(Node.DISTRIBUTED_EVENT_DISPATCHER, remoteEventDispatcher);
@@ -62,7 +67,7 @@ public class Host {
 		Thread checkCoord = new CleanableThread("checkCoord") {
 			public void run(){
 				try {
-					Thread.sleep(5000);
+					Thread.sleep(Constant.CHECK_COORD);
 				} catch (InterruptedException e1) {
 					e1.printStackTrace();
 				}
@@ -84,7 +89,7 @@ public class Host {
 			public void run() {
 				while(true){
 					try {
-						Thread.sleep(1000);
+						Thread.sleep(Constant.CHECK_CONNECTED_NODES);
 						try {
 
 							for(NodeInformation connectedNode : cluster.connectedNodes()){
@@ -324,7 +329,6 @@ public class Host {
 		for(Agent agent : this.getSimulation().getAgentsRunning()){
 			NodeAgent nodeAgent = new NodeAgent(this.getNodeInformation(), agent);
 			nodeAgentsToMove.add(nodeAgent);
-			
 		}
 		
 		balancer.shutdown(nodeAgentsToMove);

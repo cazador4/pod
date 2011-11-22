@@ -48,6 +48,22 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 		elections = new ConcurrentHashMap<NodeInformation, Long>();
 		coordinators = new ConcurrentHashMap<NodeInformation, Long>();
 		nodeCountAgentsList = new ArrayList<NodeCountAgents>();
+
+		Thread cleanOldElections = new CleanableThread("cleanOldElections") {
+			@Override
+			public void run() {
+				try {
+					while(true){
+						Thread.sleep(Constant.CLEAR_LISTS);
+						if(!isOnElection.get())
+							elections.clear();
+					}
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		};
+		cleanOldElections.start();
 	}
 
 	public List<NodeCountAgents> getList(){
@@ -62,13 +78,13 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 			coord=null;
 			if(myNode.id().compareTo(node.id())>0){
 				isOk.set(true);
-				System.out.println("Hice un ok! al nodo: "+ node);
+				//System.out.println("Hice un ok! al nodo: "+ node);
 				if(!isOnElection.getAndSet(true)){
 					Thread newElection = new CleanableThread("newElection"){
 						public void run(){
 							try {
 								host.getAgentsBalancerFor(node).bullyOk(myNode);
-								System.out.println("Mande una eleccion!");
+								//System.out.println("Mande una eleccion!");
 								long timeElection = System.currentTimeMillis();
 								for(final NodeInformation connectedNode : host.getCluster().connectedNodes()){
 									if(!connectedNode.equals(myNode) && !connectedNode.equals(node)){
@@ -79,7 +95,7 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 									Thread.sleep(Constant.WAIT_FOR_COORDINATOR);
 									isOnElection.set(false);
 									if(isOk.get()){
-										System.out.println("Seteo que el coord soy yo!");
+										//System.out.println("Seteo que el coord soy yo!");
 										long timeCoord=System.currentTimeMillis();
 										for(NodeInformation connectedNode2 : host.getCluster().connectedNodes()){
 											host.getAgentsBalancerFor(connectedNode2).bullyCoordinator(myNode, timeCoord);
@@ -107,13 +123,8 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 					bullyCoordinator(myNode, timeCoord);
 					reloadAndBalanceNodeCountAgentsList();
 				}
-				/*if(myNode.id().compareTo(node.id())==0){
-					long timeCoord=System.currentTimeMillis();
-					bullyCoordinator(myNode, timeCoord);
-					reloadAndBalanceNodeCountAgentsList();	
-				}*/
 				else{
-					System.out.println("Mi nodo es menor");
+					//System.out.println("Mi nodo es menor");
 					Thread broadcastElection = new CleanableThread("broadcastElection") {
 						public void run(){
 							try {
@@ -172,7 +183,7 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 			coord=node;
 			coordinatorLock.countDown(); 
 			isOnElection.set(false);
-			System.out.println("El coordinador es: " + node +" en el tiempo: " + timestamp);
+//			System.out.println("El coordinador es: " + node +" en el tiempo: " + timestamp);
 			Thread newCoordinator = new CleanableThread("newCoordinator") {
 				public void run(){
 					try {
@@ -207,7 +218,6 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 			AgentsTransfer agentsTransfer = host.getAgentsTransferFor(nodeToAdd);
 			agentsTransfer.runAgentsOnNode(agents);
 			try {
-				//TODO ver que pasa cuando se desconecta con la election
 				host.getCluster().disconnectFromGroup(nodeToShutdown);
 				host.getAgentsBalancer().getCoordinator();
 				reloadAndBalanceNodeCountAgentsList();
@@ -265,7 +275,8 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 		return nodeToReturn;
 	}
 
-
+	//balance
+	
 	private Thread reloadThread;
 
 	public void reloadAndBalanceNodeCountAgentsList(){

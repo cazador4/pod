@@ -21,6 +21,7 @@ import ar.edu.itba.node.Node;
 import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.ClusterAdministration;
 import ar.edu.itba.pod.agent.runner.Agent;
+import ar.edu.itba.pod.legajo48421.node.api.Constant;
 import ar.edu.itba.pod.legajo48421.node.api.Host;
 import ar.edu.itba.pod.thread.CleanableThread;
 
@@ -92,7 +93,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 					Registry registry;
 					NodeInformation connectedNode=null;
 					try {
-						Thread.sleep(5000);
+						Thread.sleep(Constant.NEW_EVENTS);
 						registry = LocateRegistry.getRegistry(host.getNodeInformation().host(), host.getNodeInformation().port());
 						ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
 						Random random = new Random();
@@ -136,7 +137,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 			public void run(){
 				while(true){
 					try {
-						Thread.sleep(10000);
+						Thread.sleep(Constant.CLEAR_PROCESSING_EVENTS);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
