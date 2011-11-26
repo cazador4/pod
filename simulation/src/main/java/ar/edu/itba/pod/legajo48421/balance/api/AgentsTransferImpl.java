@@ -10,6 +10,7 @@ import java.util.Set;
 import ar.edu.itba.balance.api.AgentsTransfer;
 import ar.edu.itba.balance.api.NodeAgent;
 import ar.edu.itba.event.EventInformation;
+import ar.edu.itba.event.RemoteEventDispatcher;
 import ar.edu.itba.pod.agent.runner.Agent;
 import ar.edu.itba.pod.legajo48421.node.api.Host;
 
@@ -38,7 +39,9 @@ public class AgentsTransferImpl implements AgentsTransfer{
 		for(NodeAgent agent : agents){
 			host.getSimulation().addAgent(agent.agent());
 			if(!host.getNodeInformation().equals(agent.node())){
-				events.addAll(host.getRemoteEventDispatcherFor(agent.node()).newEventsFor(host.getNodeInformation()));
+				RemoteEventDispatcher remoteEventDispatcher = host.getRemoteEventDispatcherFor(agent.node());
+				if(remoteEventDispatcher!=null)
+					events.addAll(remoteEventDispatcher.newEventsFor(host.getNodeInformation()));
 			}
 
 			for(EventInformation event : events){

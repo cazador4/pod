@@ -51,7 +51,7 @@ public class ClusterSimulation extends LocalSimulation{
 		}
 		else{
 			try {
-				Registry registry =  LocateRegistry.getRegistry(coord.host(), coord.port());
+				Registry registry =  LocateRegistry.getRegistry(host.getAgentsBalancer().getCoordinator().host(), host.getAgentsBalancer().getCoordinator().port());
 				AgentsBalancer agentsBalancer = (AgentsBalancer)registry.lookup(Node.AGENTS_BALANCER);
 				agentsBalancer.addAgentToCluster(nodeAgent);
 			} catch (AccessException e) {

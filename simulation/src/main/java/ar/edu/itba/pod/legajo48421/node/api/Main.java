@@ -22,6 +22,7 @@ import ar.edu.itba.node.Node;
 import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.ClusterAdministration;
 import ar.edu.itba.node.api.NodeStatistics;
+import ar.edu.itba.node.api.StatisticReports;
 import ar.edu.itba.pod.agent.market.AgentState;
 import ar.edu.itba.pod.agent.market.Market;
 import ar.edu.itba.pod.agent.market.Producer;
@@ -40,15 +41,22 @@ public class Main {
 			//CADA NODO TIENE QUE SABER QUIEN ES EL NODO COORDINADOR.
 			try {
 				final Host host = new Host(args[0], Integer.valueOf(args[1]), args[2]);
+				Thread.sleep(5000);
+				host.getAgentsBalancer().bullyElection(host.getNodeInformation(), System.currentTimeMillis());
 				host.getCluster().createGroup();
 
 				//host.getAgentsBalancer().bullyCoordinator(host.getNodeInformation(), System.currentTimeMillis());
-				host.getAgentsBalancer().bullyElection(host.getNodeInformation(), System.currentTimeMillis());
-
+				
+				Resource gold = new Resource("Mineral", "Gold");
+				//host.getCluster().createGroup();
+				ClusterSimulation node = new ClusterSimulation(TimeMappers.oneSecondEach(Duration.standardHours(6)), host);
+				host.setSimulation(node);
+				node.add(new Producer(host.getNodeInformation().port() + " - gold mine", gold, Duration.standardHours(2), 5));
+				
 
 				Resource steel = new Resource("Alloy", "Steel");
 				TimeMapper timeMapper = TimeMappers.oneSecondEach(Duration.standardHours(6));
-				ClusterSimulation node = new ClusterSimulation(timeMapper, host);
+				//ClusterSimulation node = new ClusterSimulation(timeMapper, host);
 				host.setSimulation(node);
 				//for (int i = 0; i < 1; i++) {
 				node.add(new Market("steel market", steel));
@@ -110,11 +118,14 @@ public class Main {
 										try {
 											Thread.sleep(6000);
 											for(NodeInformation nodeConnected : host.getCluster().connectedNodes()){
-												NodeStatistics nodeStatistics = host.getStatisticsFor(nodeConnected).getNodeStatistics();
-												System.out.println("Node: " + nodeConnected);
-												System.out.println("Count Agents: " + nodeStatistics.getNumberOfAgents());
-												for(AgentState agentState:nodeStatistics.getAgentState()){
-													System.out.println("State: " +  agentState);
+												StatisticReports statisticReports = host.getStatisticsFor(nodeConnected);
+												if(statisticReports!=null){
+													NodeStatistics nodeStatistics = statisticReports.getNodeStatistics();
+													System.out.println("Node: " + nodeConnected);
+													System.out.println("Count Agents: " + nodeStatistics.getNumberOfAgents());
+													for(AgentState agentState:nodeStatistics.getAgentState()){
+														System.out.println("State: " +  agentState);
+													}
 												}
 											}
 										} catch (RemoteException e) {
@@ -134,12 +145,12 @@ public class Main {
 								public void run() {
 									BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
 									try{
-									String s = br.readLine();
-									switch(Integer.valueOf(s)){
-									case 1:
-										host.shutdown();
-										break;
-									}
+										String s = br.readLine();
+										switch(Integer.valueOf(s)){
+										case 1:
+											host.shutdown();
+											break;
+										}
 									} catch (IOException e){
 									} catch (NotBoundException e) {
 										// TODO Auto-generated catch block
@@ -167,6 +178,9 @@ public class Main {
 				//e.printStackTrace();
 			} catch (AlreadyBoundException e) {
 				//e.printStackTrace();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
 		}
 		//NODE MAIN

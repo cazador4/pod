@@ -29,12 +29,13 @@ public class ClusterAdministrationImpl implements ClusterAdministration{
 		} catch (RemoteException e) {
 			e.printStackTrace();
 		}
+		connectedNodes.add(this.host.getNodeInformation());
 	}
 
 	@Override
 	public void createGroup() throws RemoteException {
 		group = "Godzilla";
-		connectedNodes.add(this.host.getNodeInformation());
+		
 	}
 
 	@Override
