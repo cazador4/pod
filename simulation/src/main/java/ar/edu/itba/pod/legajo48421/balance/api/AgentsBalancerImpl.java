@@ -76,8 +76,6 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 		if(checkElection(node, timestamp)){
 			//VEO SI TENGO MAYOR ID QUE EL QUE LLEGA
 			coord=null;
-			System.out.println(myNode.id());
-			System.out.println(node.id());
 			if(myNode.id().compareTo(node.id())>=0){
 				isOk.set(true);
 				//System.out.println("Hice un ok! al nodo: "+ node);
@@ -90,7 +88,6 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 									if(agentsBalancer!=null)
 										agentsBalancer.bullyOk(myNode);
 								}
-								System.out.println("Mande una eleccion!");
 								long timeElection = System.currentTimeMillis();
 								for(final NodeInformation connectedNode : host.getCluster().connectedNodes()){
 									if(!connectedNode.equals(myNode) && !connectedNode.equals(node)){
@@ -103,14 +100,12 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 									Thread.sleep(Constant.WAIT_FOR_COORDINATOR);
 									isOnElection.set(false);
 									if(isOk.get()){
-										System.out.println("Seteo que el coord soy yo!");
 										long timeCoord=System.currentTimeMillis();
 										for(NodeInformation connectedNode2 : host.getCluster().connectedNodes()){
 											AgentsBalancer agentsBalancerConnected = host.getAgentsBalancerFor(connectedNode2);
 											if(agentsBalancerConnected!=null)
 												agentsBalancerConnected.bullyCoordinator(myNode, timeCoord);
 										}
-										//host.setCoordinator(myNode);
 										coord=myNode;
 										reloadAndBalanceNodeCountAgentsList();
 									}
@@ -145,7 +140,7 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 									if(!connectedNode.equals(node) && !connectedNode.equals(myNode)){
 										try{
 											AgentsBalancer agentsBalancer = host.getAgentsBalancerFor(connectedNode);
-											System.out.println("soy el nodo " + myNode + " y hago Broadcast al nodo " + connectedNode + " de la elec del nodo " + node);
+											//System.out.println("soy el nodo " + myNode + " y hago Broadcast al nodo " + connectedNode + " de la elec del nodo " + node);
 											if(agentsBalancer!=null)
 												agentsBalancer.bullyElection(node, timestamp);
 										} catch(RemoteException e1){
@@ -183,12 +178,14 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 		return false;
 	}
 
-	public synchronized boolean checkCoordinator(NodeInformation node, long timestamp){
-		if(!coordinators.containsKey(node) || coordinators.get(node)<timestamp){
-			coordinators.put(node, timestamp);
-			return true;
+	public boolean checkCoordinator(NodeInformation node, long timestamp){
+		synchronized(AgentsBalancerImpl.class){
+			if(!coordinators.containsKey(node) || coordinators.get(node)<timestamp){
+				coordinators.put(node, timestamp);
+				return true;
+			}
+			return false;
 		}
-		return false;
 	}
 
 	@Override
@@ -250,6 +247,7 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 	@Override
 	public void addAgentToCluster(NodeAgent agent) throws RemoteException,
 	NotCoordinatorException {
+		System.out.println("Agrego al agent al cluster");
 		if(getCoordinator().equals(myNode)){
 			Collections.sort(nodeCountAgentsList);
 			if(nodeCountAgentsList.isEmpty()){
@@ -280,11 +278,9 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 			nodeToReturn = coord;
 		} else {
 			while(algo.get()) {
-				//System.out.println("ENTRO AL WHILE");
 				try {
 					algo.set(!coordinatorLock.await(Constant.COORDINATOR_LOOK_WAIT, TimeUnit.MILLISECONDS));
 					if (algo.get()) {
-						System.out.println("Entre aca");
 						bullyElection(myNode, DateTime.now().getMillis());
 					} else {
 						coordinatorLock = new CountDownLatch(1);

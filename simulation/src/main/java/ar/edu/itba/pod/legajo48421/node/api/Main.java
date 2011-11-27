@@ -41,7 +41,7 @@ public class Main {
 			//CADA NODO TIENE QUE SABER QUIEN ES EL NODO COORDINADOR.
 			try {
 				final Host host = new Host(args[0], Integer.valueOf(args[1]), args[2]);
-				Thread.sleep(5000);
+				//Thread.sleep(5000);
 				host.getAgentsBalancer().bullyElection(host.getNodeInformation(), System.currentTimeMillis());
 				host.getCluster().createGroup();
 
@@ -178,9 +178,6 @@ public class Main {
 				//e.printStackTrace();
 			} catch (AlreadyBoundException e) {
 				//e.printStackTrace();
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
 			}
 		}
 		//NODE MAIN
@@ -268,7 +265,7 @@ public class Main {
 
 	public enum Command
 	{
-		list, close, newevent, events, coord, agents, shutdown, add;
+		list, close, newevent, events, coord, agents, shutdown, add, connect, addAgent, c, p, m, copper, steel, gold, s, n;
 
 		public static Command toCommand(String str)
 		{

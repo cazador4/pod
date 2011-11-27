@@ -161,6 +161,7 @@ public class Host {
 
 	public void connect(String host, int port) throws RemoteException, NotBoundException{
 		cluster.connectToGroup(host, port);
+		agentsBalancer.bullyElection(node, System.currentTimeMillis());
 	}
 
 	public ClusterAdministration getCluster(){

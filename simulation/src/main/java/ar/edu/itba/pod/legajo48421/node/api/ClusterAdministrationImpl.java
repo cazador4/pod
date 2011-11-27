@@ -88,6 +88,7 @@ public class ClusterAdministrationImpl implements ClusterAdministration{
 			};
 			disconnectBroadCast.run();
 			if(node.equals(host.getAgentsBalancer().getCoordinator())){
+				System.out.println("ENTRA AL disconnectFromGroup");
 				host.getAgentsBalancer().bullyElection(host.getNodeInformation(), System.currentTimeMillis());
 				/*if(connectedNodes.size()>0){
 					NodeInformation nodeRandom = connectedNodes.iterator().next();
