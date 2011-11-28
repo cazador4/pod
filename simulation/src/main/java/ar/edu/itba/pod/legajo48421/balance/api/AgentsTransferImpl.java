@@ -37,13 +37,17 @@ public class AgentsTransferImpl implements AgentsTransfer{
 		Set <EventInformation> events = new HashSet<EventInformation>();
 		Preconditions.checkNotNull(agents, "Agents can not be null");
 		for(NodeAgent agent : agents){
-			host.getSimulation().addAgent(agent.agent());
+			
+			
+			
 			if(!host.getNodeInformation().equals(agent.node())){
 				RemoteEventDispatcher remoteEventDispatcher = host.getRemoteEventDispatcherFor(agent.node());
 				if(remoteEventDispatcher!=null)
 					events.addAll(remoteEventDispatcher.newEventsFor(host.getNodeInformation()));
 			}
 
+			host.getExtendedMultiThreadEventDispatcher().setAgentQueue(agent.agent(), host.getRemoteEventDispatcher().moveQueueFor(agent.agent()));
+			
 			for(EventInformation event : events){
 				try {
 					host.getRemoteEventDispatcher().publish(event);
@@ -52,7 +56,9 @@ public class AgentsTransferImpl implements AgentsTransfer{
 					e.printStackTrace();
 				}
 			}
-			host.getExtendedMultiThreadEventDispatcher().setAgentQueue(agent.agent(), host.getRemoteEventDispatcher().moveQueueFor(agent.agent()));
+			//host.getDispatcher().setAgentQueue(nodeAgent.agent(), dispatcher.moveQueueFor(nodeAgent.agent()));
+			System.out.println("agregando al agent " + agent.agent().name() + " al nodo " + host.getNodeInformation());
+			host.getSimulation().addAgent(agent.agent());
 		}
 
 		host.getRemoteEventDispatcher().getLock().writeLock().unlock();

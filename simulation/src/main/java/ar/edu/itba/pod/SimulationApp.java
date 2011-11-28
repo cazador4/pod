@@ -4,10 +4,12 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.rmi.AlreadyBoundException;
+import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 
 import org.joda.time.Duration;
 
+import ar.edu.itba.balance.api.NotCoordinatorException;
 import ar.edu.itba.node.NodeInformation;
 import ar.edu.itba.node.api.NodeStatistics;
 import ar.edu.itba.node.api.StatisticReports;
@@ -54,9 +56,11 @@ public class SimulationApp implements Runnable {
 					boolean connect = false;
 					try {
 						BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-						System.out.println("Ingrese IP");
+						System.out.println("Ingrese IP (Press enter to default)");
 						String ipAddress;
 						ipAddress = br.readLine();
+						if(ipAddress.isEmpty())
+							ipAddress = "127.0.0.1";
 						System.out.println("Puerto");
 						String port = br.readLine();
 						final Host host = new Host(ipAddress, Integer.valueOf(port), ipAddress+":"+port);
@@ -80,14 +84,13 @@ public class SimulationApp implements Runnable {
 								case connect:
 									connect=true;
 									if(!firstTime){
-										System.out.println("Ingrese IP a conectar");
+										System.out.println("Ingrese IP a conectar (Press Enter to default)");
 										String ipToConnect = br.readLine();
+										if(ipToConnect.isEmpty())
+											ipAddress = "127.0.0.1";
 										System.out.println("Ingrese Puerto");
 										String portToConnect = br.readLine();
-										//node = new ClusterSimulation(timeMapper, host);
 										System.out.println("Termina el cluster");
-										//host.setSimulation(node);
-										//Registry connectedRegistry = LocateRegistry.getRegistry(ipToConnect, Integer.valueOf(portToConnect));
 										host.connect(ipToConnect, Integer.valueOf(portToConnect));
 									}
 									else
@@ -171,7 +174,31 @@ public class SimulationApp implements Runnable {
 
 									};
 									newStatistics.start();
+									Thread shutdown = new CleanableThread("threadShutdown") {
+										@Override
+										public void run() {
+											try {
+												while(true){
+													BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+													String shut = br.readLine();
+													if(Command.toCommand(shut).equals(Command.shutdown)){
+														host.shutdown();
+													} 
+												}
+											}catch (RemoteException e) {
+												e.printStackTrace();
+											} catch (NotBoundException e) {
+												e.printStackTrace();
+											} catch (NotCoordinatorException e) {
+												e.printStackTrace();
+											} catch (IOException e) {
+												e.printStackTrace();
+											}
+										}
+									};
+									shutdown.start();
 									host.getSimulation().startAndWait(Duration.standardMinutes(10));
+
 									break;
 								}
 							} 
@@ -189,7 +216,6 @@ public class SimulationApp implements Runnable {
 				}
 			};
 			menuThread.start();
-
 
 		} catch (NumberFormatException e1) {
 			e1.printStackTrace();

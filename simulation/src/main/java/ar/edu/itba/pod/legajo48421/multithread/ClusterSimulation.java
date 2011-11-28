@@ -40,8 +40,9 @@ public class ClusterSimulation extends LocalSimulation{
 		checkNotNull(agent, "Agent cannot be null");
 		NodeInformation coord = host.getAgentsBalancer().getCoordinator();
 		NodeAgent nodeAgent = new NodeAgent(host.getNodeInformation(), agent);
-		if(host.getNodeInformation().equals(host.getAgentsBalancer().getCoordinator())){
+		/*if(host.getNodeInformation().equals(host.getAgentsBalancer().getCoordinator())){
 			try {
+
 				host.getAgentsBalancer().addAgentToCluster(nodeAgent);
 			} catch (RemoteException e) {
 				//e.printStackTrace();
@@ -49,34 +50,34 @@ public class ClusterSimulation extends LocalSimulation{
 				//e.printStackTrace();
 			}
 		}
-		else{
+		else{*/
+		try {
+			Registry registry =  LocateRegistry.getRegistry(host.getAgentsBalancer().getCoordinator().host(), host.getAgentsBalancer().getCoordinator().port());
+			AgentsBalancer agentsBalancer = (AgentsBalancer)registry.lookup(Node.AGENTS_BALANCER);
+			agentsBalancer.addAgentToCluster(nodeAgent);
+		} catch (AccessException e) {
+			//e.printStackTrace();
+		} catch (RemoteException e) {
+			//e.printStackTrace();
 			try {
-				Registry registry =  LocateRegistry.getRegistry(host.getAgentsBalancer().getCoordinator().host(), host.getAgentsBalancer().getCoordinator().port());
-				AgentsBalancer agentsBalancer = (AgentsBalancer)registry.lookup(Node.AGENTS_BALANCER);
-				agentsBalancer.addAgentToCluster(nodeAgent);
-			} catch (AccessException e) {
-				//e.printStackTrace();
-			} catch (RemoteException e) {
-				//e.printStackTrace();
-				try {
-					host.getCluster().disconnectFromGroup(coord);
-				} catch (RemoteException e1) {
-					e1.printStackTrace();
-				} catch (NotBoundException e1) {
-					e1.printStackTrace();
-				}
-			} catch (NotBoundException e) {
-				try {
-					host.getCluster().disconnectFromGroup(coord);
-				} catch (RemoteException e1) {
-					e1.printStackTrace();
-				} catch (NotBoundException e1) {
-					e1.printStackTrace();
-				}
-			} catch (NotCoordinatorException e) {
-				e.printStackTrace();
+				host.getCluster().disconnectFromGroup(coord);
+			} catch (RemoteException e1) {
+				e1.printStackTrace();
+			} catch (NotBoundException e1) {
+				e1.printStackTrace();
 			}
+		} catch (NotBoundException e) {
+			try {
+				host.getCluster().disconnectFromGroup(coord);
+			} catch (RemoteException e1) {
+				e1.printStackTrace();
+			} catch (NotBoundException e1) {
+				e1.printStackTrace();
+			}
+		} catch (NotCoordinatorException e) {
+			e.printStackTrace();
 		}
+		//}
 	}
 
 

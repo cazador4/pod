@@ -108,7 +108,10 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 										}
 										coord=myNode;
 										reloadAndBalanceNodeCountAgentsList();
+										System.out.println("SOY EL NUEVO COORDINADOR!");
 									}
+									else
+										nodeCountAgentsList.clear();
 								} catch (InterruptedException e) {
 									//e.printStackTrace();
 								}
@@ -125,36 +128,38 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 				}
 			}
 			else{
-				if(host.getCluster().connectedNodes().size()==1){
-					long timeCoord=System.currentTimeMillis();
-					bullyCoordinator(myNode, timeCoord);
-					reloadAndBalanceNodeCountAgentsList();
-				}
-				else{
-					System.out.println("Mi nodo es menor");
-					Thread broadcastElection = new CleanableThread("broadcastElection") {
-						public void run(){
-							try {
-								//System.out.println("Hago broadCast de la eleccion del nodo: "+ node + " con tiempo "+ timestamp);
-								for(NodeInformation connectedNode : host.getCluster().connectedNodes()){
-									if(!connectedNode.equals(node) && !connectedNode.equals(myNode)){
-										try{
-											AgentsBalancer agentsBalancer = host.getAgentsBalancerFor(connectedNode);
-											//System.out.println("soy el nodo " + myNode + " y hago Broadcast al nodo " + connectedNode + " de la elec del nodo " + node);
-											if(agentsBalancer!=null)
-												agentsBalancer.bullyElection(node, timestamp);
-										} catch(RemoteException e1){
-											//e1.printStackTrace();
-										}
+				//if(host.getCluster().connectedNodes().size()==1){
+				//long timeCoord=System.currentTimeMillis();
+				//bullyCoordinator(myNode, timeCoord);
+				//System.out.println("Estoy aca");
+				//reloadAndBalanceNodeCountAgentsList();
+				//}
+				//else{
+				System.out.println("Mi nodo es menor");
+				nodeCountAgentsList.clear();
+				Thread broadcastElection = new CleanableThread("broadcastElection") {
+					public void run(){
+						try {
+							//System.out.println("Hago broadCast de la eleccion del nodo: "+ node + " con tiempo "+ timestamp);
+							for(NodeInformation connectedNode : host.getCluster().connectedNodes()){
+								if(!connectedNode.equals(node) && !connectedNode.equals(myNode)){
+									try{
+										AgentsBalancer agentsBalancer = host.getAgentsBalancerFor(connectedNode);
+										//System.out.println("soy el nodo " + myNode + " y hago Broadcast al nodo " + connectedNode + " de la elec del nodo " + node);
+										if(agentsBalancer!=null)
+											agentsBalancer.bullyElection(node, timestamp);
+									} catch(RemoteException e1){
+										//e1.printStackTrace();
 									}
 								}
-							} catch (RemoteException e) {
-								//e.printStackTrace();
 							}
+						} catch (RemoteException e) {
+							//e.printStackTrace();
 						}
-					};
-					broadcastElection.start();
-				}
+					}
+				};
+				broadcastElection.start();
+				//}
 			}
 		}
 	}
@@ -223,20 +228,25 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 	public void shutdown(List<NodeAgent> agents) throws RemoteException,
 	NotCoordinatorException {
 		if(getCoordinator().equals(myNode)){
-			NodeAgent nodeAgent = agents.get(0);
-			NodeInformation nodeToShutdown = nodeAgent.node();
-			nodeCountAgentsList.remove(new NodeCountAgents(nodeToShutdown, agents.size()));
-			NodeInformation nodeToAdd = nodeCountAgentsList.get(0).nodeInformation;
-			nodeCountAgentsList.get(0).setCountAgents(agents.size()+ nodeCountAgentsList.get(0).countAgents);
-			AgentsTransfer agentsTransfer = host.getAgentsTransferFor(nodeToAdd);
-			if(agentsTransfer!=null){
-				agentsTransfer.runAgentsOnNode(agents);
-				try {
-					host.getCluster().disconnectFromGroup(nodeToShutdown);
-					host.getAgentsBalancer().getCoordinator();
-					reloadAndBalanceNodeCountAgentsList();
-				} catch (NotBoundException e) {
-					//e.printStackTrace();
+			if(!agents.isEmpty()){
+				System.out.println("Agentes a pasar " + agents);
+				NodeAgent nodeAgent = agents.get(0);
+				synchronized(nodeCountAgentsList){
+					NodeInformation nodeToShutdown = nodeAgent.node();
+					nodeCountAgentsList.remove(new NodeCountAgents(nodeToShutdown, agents.size()));
+					NodeInformation nodeToAdd = nodeCountAgentsList.get(0).nodeInformation;
+					nodeCountAgentsList.get(0).setCountAgents(agents.size()+ nodeCountAgentsList.get(0).countAgents);
+					AgentsTransfer agentsTransfer = host.getAgentsTransferFor(nodeToAdd);
+					if(agentsTransfer!=null){
+						agentsTransfer.runAgentsOnNode(agents);
+						try {
+							host.getCluster().disconnectFromGroup(nodeToShutdown);
+							//host.getAgentsBalancer().getCoordinator();
+							reloadAndBalanceNodeCountAgentsList();
+						} catch (NotBoundException e) {
+							//e.printStackTrace();
+						}
+					}
 				}
 			}
 		}
@@ -248,27 +258,32 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 	public void addAgentToCluster(NodeAgent agent) throws RemoteException,
 	NotCoordinatorException {
 		System.out.println("Agrego al agent al cluster");
-		if(getCoordinator().equals(myNode)){
-			Collections.sort(nodeCountAgentsList);
-			if(nodeCountAgentsList.isEmpty()){
-				List<NodeAgent> result = new ArrayList<NodeAgent>();
-				result.add(agent);
-				host.getAgentsTransfer().runAgentsOnNode(result);
-			}else{
+		synchronized(nodeCountAgentsList){
+			if(getCoordinator().equals(myNode)){
 				Collections.sort(nodeCountAgentsList);
-				NodeCountAgents nodeCountAgent = nodeCountAgentsList.get(0);
-				AgentsTransfer agentsTransfer = host.getAgentsTransferFor(nodeCountAgent.getNodeInformation());
-				if(agentsTransfer!=null){
+				if(nodeCountAgentsList.isEmpty()){
 					List<NodeAgent> result = new ArrayList<NodeAgent>();
 					result.add(agent);
-					agentsTransfer.runAgentsOnNode(result);
-					nodeCountAgent.addAgent();
+					host.getAgentsTransfer().runAgentsOnNode(result);
+				}
+				else{
 					Collections.sort(nodeCountAgentsList);
+					System.out.println("el nodo es: " + nodeCountAgentsList.get(0).getNodeInformation());
+					NodeCountAgents nodeCountAgent = nodeCountAgentsList.get(0);
+					AgentsTransfer agentsTransfer = host.getAgentsTransferFor(nodeCountAgent.getNodeInformation());
+					if(agentsTransfer!=null){
+						System.out.println("Entra al distinto a null");
+						nodeCountAgent.addAgent();
+						List<NodeAgent> result = new ArrayList<NodeAgent>();
+						result.add(agent);
+						agentsTransfer.runAgentsOnNode(result);
+						Collections.sort(nodeCountAgentsList);
+					}
 				}
 			}
+			else
+				throw new NotCoordinatorException(host.getNodeInformation());
 		}
-		else
-			throw new NotCoordinatorException(host.getNodeInformation());
 	}
 
 	public NodeInformation getCoordinator(){
@@ -299,25 +314,29 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 
 	private Thread reloadThread;
 
-	public synchronized void reloadAndBalanceNodeCountAgentsList(){
+	public void reloadAndBalanceNodeCountAgentsList(){
 		reloadThread = new CleanableThread("reloadThread") {
 			public void run(){
-				System.out.println("starting balance agents...");
-				nodeCountAgentsList.clear();
-				try {
-					for(NodeInformation connectedNode : host.getCluster().connectedNodes()){
-						AgentsTransfer agentsTransfer = host.getAgentsTransferFor(connectedNode);
-						if(agentsTransfer!=null){
-							NodeCountAgents nodeCountAgents = new NodeCountAgents(connectedNode, agentsTransfer.getNumberOfAgents());
-							nodeCountAgentsList.add(nodeCountAgents);
+				System.out.println("EMPIEZO A CORRER!");
+				synchronized (nodeCountAgentsList) {
+					System.out.println("starting balance agents...");
+					nodeCountAgentsList.clear();
+					try {
+						for(NodeInformation connectedNode : host.getCluster().connectedNodes()){
+							AgentsTransfer agentsTransfer = host.getAgentsTransferFor(connectedNode);
+							if(agentsTransfer!=null){
+								NodeCountAgents nodeCountAgents = new NodeCountAgents(connectedNode, agentsTransfer.getNumberOfAgents());
+								nodeCountAgentsList.add(nodeCountAgents);
+							}
 						}
+						balance(nodeCountAgentsList);
+						balanceInNodes();
+						System.out.println("TERMINE DE BALANCEAR");
+					} catch (AccessException e) {
+						//e.printStackTrace();
+					} catch (RemoteException e) {
+						//e.printStackTrace();
 					}
-					balance(nodeCountAgentsList);
-					balanceInNodes();
-				} catch (AccessException e) {
-					//e.printStackTrace();
-				} catch (RemoteException e) {
-					//e.printStackTrace();
 				}
 			}
 
@@ -339,6 +358,8 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 						int diff = agentsTransfer.getNumberOfAgents()-nodeCountAgent.countAgents;
 						if(diff < 0){
 							List<NodeAgent> result = new ArrayList<NodeAgent>();
+							System.out.println("Diferencia " + diff);
+							System.out.println("Nodos a agregar: " + nodesToAdd);
 							for(int i=0; i<(diff*-1); i++)
 								result.add(nodesToAdd.get(i));
 							agentsTransfer.runAgentsOnNode(result);
@@ -352,27 +373,30 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 				Collections.sort(nodeCountAgentsList, comparator);
 
 				boolean condition=false;
-				int cantFirst = nodeCountAgentsList.get(0).getCountAgents();
-				int cantLast = nodeCountAgentsList.get(nodeCountAgentsList.size()-1).getCountAgents();
-				int diff = cantFirst-cantLast;
-				if(diff>1){
-					condition=true;
-				}
-				while(condition){
-					int newFirst = cantFirst-diff/2;
-					int newLast = cantLast+diff/2;
-					nodeCountAgentsList.get(0).setCountAgents(newFirst);
-					nodeCountAgentsList.get(nodeCountAgentsList.size()-1).setCountAgents(newLast);
-					Collections.sort(nodeCountAgentsList, comparator);
-					cantFirst = nodeCountAgentsList.get(0).getCountAgents();
-					cantLast = nodeCountAgentsList.get(nodeCountAgentsList.size()-1).getCountAgents();
-					diff = cantFirst-cantLast;
-					if(diff>1)
+				if(!nodeCountAgentsList.isEmpty()){
+					int cantFirst = nodeCountAgentsList.get(0).getCountAgents();
+					int cantLast = nodeCountAgentsList.get(nodeCountAgentsList.size()-1).getCountAgents();
+					int diff = cantFirst-cantLast;
+					if(diff>1){
 						condition=true;
-					else
-						condition=false;
+					}
+					while(condition){
+						int newFirst = cantFirst-diff/2;
+						int newLast = cantLast+diff/2;
+						nodeCountAgentsList.get(0).setCountAgents(newFirst);
+						nodeCountAgentsList.get(nodeCountAgentsList.size()-1).setCountAgents(newLast);
+						Collections.sort(nodeCountAgentsList, comparator);
+						cantFirst = nodeCountAgentsList.get(0).getCountAgents();
+						cantLast = nodeCountAgentsList.get(nodeCountAgentsList.size()-1).getCountAgents();
+						diff = cantFirst-cantLast;
+						if(diff>1)
+							condition=true;
+						else
+							condition=false;
+					}
 				}
 			}
+
 		};
 		reloadThread.start();
 	}

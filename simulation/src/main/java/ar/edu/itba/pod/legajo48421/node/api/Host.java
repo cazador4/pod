@@ -237,7 +237,7 @@ public class Host {
 		} catch (AccessException e) {
 			e.printStackTrace();
 		} catch (RemoteException e) {
-			//e.printStackTrace();
+			e.printStackTrace();
 			try {
 				this.cluster.disconnectFromGroup(node);
 			} catch (RemoteException e1) {
@@ -246,7 +246,7 @@ public class Host {
 				e1.printStackTrace();
 			}
 		} catch (NotBoundException e) {
-			//e.printStackTrace();
+			e.printStackTrace();
 			try {
 				this.cluster.disconnectFromGroup(node);
 			} catch (RemoteException e1) {
@@ -323,15 +323,16 @@ public class Host {
 	}
 	
 	public void shutdown() throws RemoteException, NotBoundException, NotCoordinatorException{
+		System.out.println("entra al shutdown");
 		Registry reg = LocateRegistry.getRegistry(this.getAgentsBalancer().getCoordinator().host(), this.getAgentsBalancer().getCoordinator().port());
 		AgentsBalancer balancer = (AgentsBalancer)reg.lookup(Node.AGENTS_BALANCER);
-		
+		System.out.println("Coord : " + this.getAgentsBalancer().getCoordinator().port());
 		List<NodeAgent> nodeAgentsToMove = new ArrayList<NodeAgent>();
 		for(Agent agent : this.getSimulation().getAgentsRunning()){
 			NodeAgent nodeAgent = new NodeAgent(this.getNodeInformation(), agent);
 			nodeAgentsToMove.add(nodeAgent);
 		}
-		
+		System.out.println("Apunto de cerrar...");
 		balancer.shutdown(nodeAgentsToMove);
 		System.exit(0);
 	}
