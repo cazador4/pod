@@ -6,6 +6,6 @@ public class Constant {
 	public static final long CLEAR_LISTS = 20000;
 	public static final long CHECK_COORD = 10000;
 	public static final long CHECK_CONNECTED_NODES = 10000;
-	public static final long NEW_EVENTS = 5000;
+	public static final long NEW_EVENTS = 900;
 	public static final long CLEAR_PROCESSING_EVENTS = 60000;
 }

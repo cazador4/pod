@@ -297,7 +297,7 @@ public class Host {
 		} catch (AccessException e) {
 			e.printStackTrace();
 		} catch (RemoteException e) {
-			//e.printStackTrace();
+			e.printStackTrace();
 			try {
 				this.cluster.disconnectFromGroup(node);
 			} catch (RemoteException e1) {
@@ -306,7 +306,7 @@ public class Host {
 				e1.printStackTrace();
 			}
 		} catch (NotBoundException e) {
-			//e.printStackTrace();
+			e.printStackTrace();
 			try {
 				this.cluster.disconnectFromGroup(node);
 			} catch (RemoteException e1) {

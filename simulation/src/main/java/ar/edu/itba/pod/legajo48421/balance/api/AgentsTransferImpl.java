@@ -37,9 +37,6 @@ public class AgentsTransferImpl implements AgentsTransfer{
 		Set <EventInformation> events = new HashSet<EventInformation>();
 		Preconditions.checkNotNull(agents, "Agents can not be null");
 		for(NodeAgent agent : agents){
-			
-			
-			
 			if(!host.getNodeInformation().equals(agent.node())){
 				RemoteEventDispatcher remoteEventDispatcher = host.getRemoteEventDispatcherFor(agent.node());
 				if(remoteEventDispatcher!=null)

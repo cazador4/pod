@@ -132,12 +132,18 @@ public class SimulationApp implements Runnable {
 										switch(Command.toCommand(type)){
 										case c:
 											host.getSimulation().add(new Consumer(resourceSelected.name() + " consumer " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
+											host.getSimulation().add(new Consumer(resourceSelected.name() + " consumer2 " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
+											host.getSimulation().add(new Consumer(resourceSelected.name() + " consumer2 " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
 											break;
 										case p:
 											host.getSimulation().add(new Producer(resourceSelected.name() + " mine " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
+											host.getSimulation().add(new Producer(resourceSelected.name() + " mine2 " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
+											host.getSimulation().add(new Producer(resourceSelected.name() + " mine3 " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
 											break;
 										case m:
 											host.getSimulation().add(new Market(resourceSelected.name() + " market " + host.getNodeInformation().port(), resourceSelected));
+											host.getSimulation().add(new Market(resourceSelected.name() + " market2 " + host.getNodeInformation().port(), resourceSelected));
+											host.getSimulation().add(new Market(resourceSelected.name() + " market3 " + host.getNodeInformation().port(), resourceSelected));
 											break;
 										}
 									}
@@ -197,8 +203,8 @@ public class SimulationApp implements Runnable {
 										}
 									};
 									shutdown.start();
-									host.getSimulation().startAndWait(Duration.standardMinutes(10));
-
+									host.getSimulation().startAndWait(Duration.standardMinutes(5));
+									host.shutdown();
 									break;
 								}
 							} 

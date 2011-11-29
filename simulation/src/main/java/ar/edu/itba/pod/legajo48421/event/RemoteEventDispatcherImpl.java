@@ -54,8 +54,9 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 					EventInformation eventInformation;
 					try {
 						eventInformation = queue.take();
+						System.out.println("La cola tiene " + queue.size());
 						processingEvents.put((EventInformation)eventInformation, System.currentTimeMillis());
-						
+
 						host.getExtendedMultiThreadEventDispatcher().publishIntern(eventInformation.source(), eventInformation.event());
 						Registry registry = LocateRegistry.getRegistry(host.getNodeInformation().host(), host.getNodeInformation().port());
 						ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
@@ -63,16 +64,18 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 						//ver cuantos false recibo del publish para no seguir mandando!
 						Set<NodeInformation> connectedNodes = cluster.connectedNodes();
 						for(NodeInformation connectedNode : connectedNodes){
-							if(countFalse<=connectedNodes.size()/2){
-								if(!connectedNode.equals(host.getNodeInformation())){
-									Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
-									RemoteEventDispatcher remoteEventDispatcher = (RemoteEventDispatcher)connectedRegistry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
-									lastTimeSendEvent.put(connectedNode, System.currentTimeMillis());
-									boolean answer = remoteEventDispatcher.publish((EventInformation)eventInformation);
-									if(!answer)
-										countFalse++;
+							//if(countFalse<=connectedNodes.size()/2){
+							if(!connectedNode.equals(host.getNodeInformation())){
+								//Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
+								RemoteEventDispatcher remoteEventDispatcher = host.getRemoteEventDispatcherFor(connectedNode);
+								lastTimeSendEvent.put(connectedNode, System.currentTimeMillis());
+								if(remoteEventDispatcher!=null){
+								boolean answer = remoteEventDispatcher.publish((EventInformation)eventInformation);
+								if(!answer)
+									countFalse++;
 								}
 							}
+							//}
 						}
 					} catch (RemoteException e) {
 						//e.printStackTrace();
@@ -100,12 +103,17 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 						Set<NodeInformation> nodes = cluster.connectedNodes();
 						if(nodes.size()>1){
 							int position = random.nextInt(nodes.size()-1);
-							connectedNode = (NodeInformation)nodes.toArray()[position];
-							if(!connectedNode.equals(host.getNodeInformation())){
-								registry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
-								RemoteEventDispatcher connectedEventDispatcher = (RemoteEventDispatcher)registry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
-								Set<EventInformation> newEvents = connectedEventDispatcher.newEventsFor(host.getNodeInformation());
-								queue.addAll(newEvents);
+							//System.out.println("posicion " + position);
+							//connectedNode = (NodeInformation)nodes.toArray()[position];
+							for(NodeInformation connectedNodeFor : nodes){
+								connectedNode = connectedNodeFor;
+								if(!connectedNodeFor.equals(host.getNodeInformation())){
+									//									System.out.println("Le pido los eventos al nodo: " + connectedNodeFor.id());
+									registry = LocateRegistry.getRegistry(connectedNodeFor.host(), connectedNodeFor.port());
+									RemoteEventDispatcher connectedEventDispatcher = (RemoteEventDispatcher)registry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
+									Set<EventInformation> newEvents = connectedEventDispatcher.newEventsFor(host.getNodeInformation());
+									queue.addAll(newEvents);
+								}
 							}
 						}
 					} catch (RemoteException e) {
@@ -132,7 +140,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 			}
 		};
 		getNewEvent.start();
-		
+
 		Thread cleanProcessingEvents = new CleanableThread("cleanProcessingEvents") {
 			public void run(){
 				while(true){
@@ -153,14 +161,14 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 	InterruptedException {
 
 		boolean result = false;
-		
 		getLock().readLock().lock();
-		if(!queue.contains(event) && !processingEvents.containsKey(event)){
-			queue.add(event);
-			result = true;
+		synchronized(queue){
+			if(!queue.contains(event) && !processingEvents.containsKey(event)){
+				queue.add(event);
+				result = true;
+			}
 		}
 		getLock().readLock().unlock();
-		
 		return result;
 	}
 
@@ -177,7 +185,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 	public synchronized ReentrantReadWriteLock getLock(){
 		return lock;
 	}
-	
+
 	@Override
 	public Set<EventInformation> newEventsFor(NodeInformation nodeInformation)
 			throws RemoteException {
@@ -190,7 +198,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 	public BlockingQueue<EventInformation> getPendingEvents(){
 		return queue;
 	}
-	
+
 	@Override
 	public BlockingQueue<Object> moveQueueFor(Agent agent)
 			throws RemoteException {

@@ -26,16 +26,18 @@ public class Main2 {
 	public static void main(String[] args) {
 		try {
 			final Host host = new Host("127.0.0.1", 1239, "127.0.0.1:1239");
-			host.connect("127.0.0.1", 1234);
+			//host.connect("127.0.0.1", 1234);
+			host.getAgentsBalancer().bullyElection(host.getNodeInformation(), System.currentTimeMillis());
+			host.getCluster().createGroup();
 			Resource resourceSelected = new Resource("Mineral", "Gold");
 			
 			host.getSimulation().add(new Producer(resourceSelected.name() + " producer222 " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
+//			host.getSimulation().add(new Consumer(resourceSelected.name() + " consumer222 " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
+//			host.getSimulation().add(new Consumer(resourceSelected.name() + " consumer " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
+//			host.getSimulation().add(new Consumer(resourceSelected.name() + " consumer " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
+//			host.getSimulation().add(new Consumer(resourceSelected.name() + " consumer " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
 			host.getSimulation().add(new Consumer(resourceSelected.name() + " consumer222 " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
-			host.getSimulation().add(new Consumer(resourceSelected.name() + " consumer " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
-			host.getSimulation().add(new Consumer(resourceSelected.name() + " consumer " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
-			host.getSimulation().add(new Consumer(resourceSelected.name() + " consumer " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
-			host.getSimulation().add(new Consumer(resourceSelected.name() + " consumer " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
-			host.getSimulation().add(new Market(resourceSelected.name() + " market "	 + host.getNodeInformation().port(), resourceSelected));
+			host.getSimulation().add(new Market(resourceSelected.name() + " market222 "	 + host.getNodeInformation().port(), resourceSelected));
 			Thread shutdown = new CleanableThread("threadShutdown") {
 				@Override
 				public void run() {
@@ -91,8 +93,8 @@ public class Main2 {
 			
 		} catch (RemoteException e) {
 			e.printStackTrace();
-		} catch (NotBoundException e) {
-			e.printStackTrace();
+		//} catch (NotBoundException e) {
+		//	e.printStackTrace();
 		} catch (AlreadyBoundException e) {
 			e.printStackTrace();
 		//} catch (NotCoordinatorException e) {

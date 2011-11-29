@@ -183,14 +183,12 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 		return false;
 	}
 
-	public boolean checkCoordinator(NodeInformation node, long timestamp){
-		synchronized(AgentsBalancerImpl.class){
-			if(!coordinators.containsKey(node) || coordinators.get(node)<timestamp){
-				coordinators.put(node, timestamp);
-				return true;
-			}
-			return false;
+	public synchronized boolean checkCoordinator(NodeInformation node, long timestamp){
+		if(!coordinators.containsKey(node) || coordinators.get(node)<timestamp){
+			coordinators.put(node, timestamp);
+			return true;
 		}
+		return false;
 	}
 
 	@Override
