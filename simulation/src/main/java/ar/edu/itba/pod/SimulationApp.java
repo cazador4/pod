@@ -168,9 +168,9 @@ public class SimulationApp implements Runnable {
 														}
 													}
 												} catch (RemoteException e) {
-													e.printStackTrace();
+													//e.printStackTrace();
 												} catch (InterruptedException e) {
-													e.printStackTrace();
+													//e.printStackTrace();
 												}
 											}
 
@@ -190,18 +190,19 @@ public class SimulationApp implements Runnable {
 													} 
 												}
 											}catch (RemoteException e) {
-												e.printStackTrace();
+//												e.printStackTrace();
 											} catch (NotBoundException e) {
-												e.printStackTrace();
+//												e.printStackTrace();
 											} catch (NotCoordinatorException e) {
-												e.printStackTrace();
+//												e.printStackTrace();
 											} catch (IOException e) {
-												e.printStackTrace();
+//												e.printStackTrace();
 											}
 										}
 									};
 									shutdown.start();
 									host.getSimulation().startAndWait(Duration.standardMinutes(5));
+									System.out.println("Termino la simulacion");
 									host.shutdown();
 									break;
 								}
@@ -211,11 +212,11 @@ public class SimulationApp implements Runnable {
 							}
 						}
 					} catch (IOException e1) {
-						e1.printStackTrace();
+//						e1.printStackTrace();
 					} catch (NumberFormatException e) {
-						e.printStackTrace();
+//						e.printStackTrace();
 					} catch (AlreadyBoundException e) {
-						e.printStackTrace();
+//						e.printStackTrace();
 					}
 				}
 			};

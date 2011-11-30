@@ -59,7 +59,7 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 							elections.clear();
 					}
 				} catch (InterruptedException e) {
-					e.printStackTrace();
+//					e.printStackTrace();
 				}
 			}
 		};
@@ -209,7 +209,7 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 									if(agentsBalancer !=null)
 										agentsBalancer.bullyCoordinator(node, timestamp);
 								} catch (RemoteException e) {
-									e.printStackTrace();
+//									e.printStackTrace();
 								}
 							}
 						}
@@ -266,11 +266,11 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 				}
 				else{
 					Collections.sort(nodeCountAgentsList);
-					System.out.println("el nodo es: " + nodeCountAgentsList.get(0).getNodeInformation());
+//					System.out.println("el nodo es: " + nodeCountAgentsList.get(0).getNodeInformation());
 					NodeCountAgents nodeCountAgent = nodeCountAgentsList.get(0);
 					AgentsTransfer agentsTransfer = host.getAgentsTransferFor(nodeCountAgent.getNodeInformation());
 					if(agentsTransfer!=null){
-						System.out.println("Entra al distinto a null");
+//						System.out.println("Entra al distinto a null");
 						nodeCountAgent.addAgent();
 						List<NodeAgent> result = new ArrayList<NodeAgent>();
 						result.add(agent);
@@ -315,9 +315,9 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 	public void reloadAndBalanceNodeCountAgentsList(){
 		reloadThread = new CleanableThread("reloadThread") {
 			public void run(){
-				System.out.println("EMPIEZO A CORRER!");
+//				System.out.println("EMPIEZO A CORRER!");
 				synchronized (nodeCountAgentsList) {
-					System.out.println("starting balance agents...");
+//					System.out.println("starting balance agents...");
 					nodeCountAgentsList.clear();
 					try {
 						for(NodeInformation connectedNode : host.getCluster().connectedNodes()){
@@ -329,7 +329,7 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 						}
 						balance(nodeCountAgentsList);
 						balanceInNodes();
-						System.out.println("TERMINE DE BALANCEAR");
+//						System.out.println("TERMINE DE BALANCEAR");
 					} catch (AccessException e) {
 						//e.printStackTrace();
 					} catch (RemoteException e) {
@@ -356,7 +356,7 @@ public class AgentsBalancerImpl implements AgentsBalancer{
 						int diff = agentsTransfer.getNumberOfAgents()-nodeCountAgent.countAgents;
 						if(diff < 0){
 							List<NodeAgent> result = new ArrayList<NodeAgent>();
-							System.out.println("Diferencia " + diff);
+//							System.out.println("Diferencia " + diff);
 							System.out.println("Nodos a agregar: " + nodesToAdd);
 							for(int i=0; i<(diff*-1); i++)
 								result.add(nodesToAdd.get(i));

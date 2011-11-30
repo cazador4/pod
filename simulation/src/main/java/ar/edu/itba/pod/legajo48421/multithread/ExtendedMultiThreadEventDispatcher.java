@@ -19,15 +19,16 @@ public class ExtendedMultiThreadEventDispatcher extends MultiThreadEventDispatch
 	@Override
 	public void publish(Agent source, Serializable event)
 			throws InterruptedException {
-		synchronized(ExtendedMultiThreadEventDispatcher.class){
-			super.publish(source, event);
-		}
+		
 		EventInformation eventInformation = new EventInformation(event, host.getNodeInformation().id(), source);
 		eventInformation.setReceivedTime(System.currentTimeMillis());
 		try {
 			host.getRemoteEventDispatcher().publish(eventInformation);
 		} catch (RemoteException e) {
 			e.printStackTrace();
+		}
+		synchronized(ExtendedMultiThreadEventDispatcher.class){
+			super.publish(source, event);
 		}
 	}
 

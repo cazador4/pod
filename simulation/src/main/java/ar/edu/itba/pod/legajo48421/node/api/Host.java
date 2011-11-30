@@ -29,7 +29,6 @@ import ar.edu.itba.pod.legajo48421.event.RemoteEventDispatcherImpl;
 import ar.edu.itba.pod.legajo48421.multithread.ClusterSimulation;
 import ar.edu.itba.pod.legajo48421.multithread.ExtendedMultiThreadEventDispatcher;
 import ar.edu.itba.pod.thread.CleanableThread;
-import ar.edu.itba.pod.time.TimeMapper;
 import ar.edu.itba.pod.time.TimeMappers;
 
 import com.google.common.base.Preconditions;
@@ -55,7 +54,7 @@ public class Host {
 		extendedMultiThreadEventDispatcher = new ExtendedMultiThreadEventDispatcher(this);
 		agentsTransfer = new AgentsTransferImpl(this);
 		statisticsReports = new StatisticsReportsImpl(this);
-		simulation = new ClusterSimulation(TimeMappers.oneSecondEach(Duration.standardHours(50)), this);
+		simulation = new ClusterSimulation(TimeMappers.oneSecondEach(Duration.standardHours(6)), this);
 		
 		registry.bind(Node.CLUSTER_COMUNICATION, cluster);
 		registry.bind(Node.DISTRIBUTED_EVENT_DISPATCHER, remoteEventDispatcher);
@@ -69,14 +68,14 @@ public class Host {
 				try {
 					Thread.sleep(Constant.CHECK_COORD);
 				} catch (InterruptedException e1) {
-					e1.printStackTrace();
+//					e1.printStackTrace();
 				}
 				if(agentsBalancer.getCoordinator()!=null){
 					if(getAgentsBalancerFor(agentsBalancer.getCoordinator())==null){
 						try {
 							agentsBalancer.bullyElection(node, System.currentTimeMillis());
 						} catch (RemoteException e) {
-							e.printStackTrace();
+//							e.printStackTrace();
 						}
 					}
 				}
@@ -137,7 +136,7 @@ public class Host {
 
 										}
 									} catch (NotBoundException e1) {
-										e1.printStackTrace();
+//										e1.printStackTrace();
 									}
 								} catch (NotBoundException e) {
 									/*try {
@@ -148,10 +147,10 @@ public class Host {
 								}
 							}
 						} catch (RemoteException e) {
-							e.printStackTrace();
+//							e.printStackTrace();
 						}
 					} catch (InterruptedException e) {
-						e.printStackTrace();
+//						e.printStackTrace();
 					}
 				}
 			}
@@ -209,21 +208,21 @@ public class Host {
 			try {
 				this.cluster.disconnectFromGroup(node);
 			} catch (RemoteException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			} catch (NotBoundException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			}
 		} catch (RemoteException e) {
 			//e.printStackTrace();
 			try {
 				this.cluster.disconnectFromGroup(node);
 			} catch (RemoteException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			} catch (NotBoundException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			}
 		} catch (NotBoundException e) {
-			e.printStackTrace();
+//			e.printStackTrace();
 		}
 		return agentsBalancer;
 	}
@@ -235,24 +234,24 @@ public class Host {
 			registry = LocateRegistry.getRegistry(node.host(), node.port());
 			remoteEventDispatcher = (RemoteEventDispatcher)registry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
 		} catch (AccessException e) {
-			e.printStackTrace();
+//			e.printStackTrace();
 		} catch (RemoteException e) {
-			e.printStackTrace();
+//			e.printStackTrace();
 			try {
 				this.cluster.disconnectFromGroup(node);
 			} catch (RemoteException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			} catch (NotBoundException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			}
 		} catch (NotBoundException e) {
 			e.printStackTrace();
 			try {
 				this.cluster.disconnectFromGroup(node);
 			} catch (RemoteException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			} catch (NotBoundException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			}
 		}
 		return remoteEventDispatcher;
@@ -265,24 +264,24 @@ public class Host {
 			registry = LocateRegistry.getRegistry(node.host(), node.port());
 			agentsTransfer = (AgentsTransfer)registry.lookup(Node.AGENTS_TRANSFER);
 		} catch (AccessException e) {
-			e.printStackTrace();
+//			e.printStackTrace();
 		} catch (RemoteException e) {
 			//e.printStackTrace();
 			try {
 				this.cluster.disconnectFromGroup(node);
 			} catch (RemoteException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			} catch (NotBoundException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			}
 		} catch (NotBoundException e) {
 			//e.printStackTrace();
 			try {
 				this.cluster.disconnectFromGroup(node);
 			} catch (RemoteException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			} catch (NotBoundException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			}
 		}
 		return agentsTransfer;
@@ -295,24 +294,24 @@ public class Host {
 			registry = LocateRegistry.getRegistry(node.host(), node.port());
 			statisticReports = (StatisticReports)registry.lookup(Node.STATISTIC_REPORTS);
 		} catch (AccessException e) {
-			e.printStackTrace();
+//			e.printStackTrace();
 		} catch (RemoteException e) {
-			e.printStackTrace();
+//			e.printStackTrace();
 			try {
 				this.cluster.disconnectFromGroup(node);
 			} catch (RemoteException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			} catch (NotBoundException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			}
 		} catch (NotBoundException e) {
-			e.printStackTrace();
+//			e.printStackTrace();
 			try {
 				this.cluster.disconnectFromGroup(node);
 			} catch (RemoteException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			} catch (NotBoundException e1) {
-				e1.printStackTrace();
+//				e1.printStackTrace();
 			}
 		}
 		return statisticReports;
@@ -332,7 +331,7 @@ public class Host {
 			NodeAgent nodeAgent = new NodeAgent(this.getNodeInformation(), agent);
 			nodeAgentsToMove.add(nodeAgent);
 		}
-		System.out.println("Apunto de cerrar...");
+//		System.out.println("Apunto de cerrar...");
 		balancer.shutdown(nodeAgentsToMove);
 		registry.unbind(Node.CLUSTER_COMUNICATION);
 		registry.unbind(Node.DISTRIBUTED_EVENT_DISPATCHER);

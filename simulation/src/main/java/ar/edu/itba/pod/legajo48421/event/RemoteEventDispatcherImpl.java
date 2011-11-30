@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map.Entry;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
@@ -56,7 +55,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 					EventInformation eventInformation;
 					try {
 						eventInformation = queue.take();
-						System.out.println("La cola tiene " + queue.size());
+//						System.out.println("La cola tiene " + queue.size());
 						processingEvents.put((EventInformation)eventInformation, System.currentTimeMillis());
 
 						host.getExtendedMultiThreadEventDispatcher().publishIntern(eventInformation.source(), eventInformation.event());
@@ -125,20 +124,20 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 						try {
 							host.getCluster().disconnectFromGroup(connectedNode);
 						} catch (RemoteException e1) {
-							e1.printStackTrace();
+//							e1.printStackTrace();
 						} catch (NotBoundException e1) {
-							e1.printStackTrace();
+//							e1.printStackTrace();
 						}
 					} catch (NotBoundException e) {
 						try {
 							host.getCluster().disconnectFromGroup(connectedNode);
 						} catch (RemoteException e1) {
-							e1.printStackTrace();
+//							e1.printStackTrace();
 						} catch (NotBoundException e1) {
-							e1.printStackTrace();
+//							e1.printStackTrace();
 						}
 					} catch (InterruptedException e) {
-						e.printStackTrace();
+//						e.printStackTrace();
 					}
 
 				}
@@ -152,7 +151,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 					try {
 						Thread.sleep(Constant.CLEAR_PROCESSING_EVENTS);
 					} catch (InterruptedException e) {
-						e.printStackTrace();
+//						e.printStackTrace();
 					}
 					processingEvents.clear();
 				}
@@ -180,7 +179,8 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 
 	private Set<EventInformation> findInQueue(String nodeId, long timestamp) {
 		Set<EventInformation> result = new HashSet<EventInformation>();
-		for(Entry<EventInformation, Long> entry : processingEvents.entrySet()){
+		Set<Entry<EventInformation, Long>> processingEventsCopy = processingEvents.entrySet();
+		for(Entry<EventInformation, Long> entry : processingEventsCopy){
 			if(timestamp<entry.getValue()){
 				result.add(entry.getKey());
 			}
