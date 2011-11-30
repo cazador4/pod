@@ -78,7 +78,7 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 											if(!answer)
 												countFalse++;
 										}catch(Exception e){
-											//SI JUSTO SE DESCONECTO EL NODO AL QUE LE IBA A PUBLICAR EVENTOS
+											//SI JUSTO SE DESCONECTO EL NODO AL QUE LE IBA A PUBLICAR EVENTOS SIGO
 										}
 									}
 								}

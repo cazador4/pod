@@ -31,7 +31,7 @@ public class SimulationApp implements Runnable {
 	@Override
 	public void run() {
 
-//		final TimeMapper timeMapper = TimeMappers.oneSecondEach(Duration.standardHours(6));
+		//		final TimeMapper timeMapper = TimeMappers.oneSecondEach(Duration.standardHours(6));
 		//final Host host;
 		try {
 			//node.add(new Producer("steel mine 1", steel, Duration.standardDays(1), 5));
@@ -187,16 +187,47 @@ public class SimulationApp implements Runnable {
 													String shut = br.readLine();
 													if(Command.toCommand(shut).equals(Command.shutdown)){
 														host.shutdown();
-													} 
+													}else
+													{
+														if(Command.toCommand(shut).equals(Command.addAgent)){
+															Resource resourceSelected=null;
+															System.out.println("Ingrese resource: gold - steel - copper");
+															String resource = br.readLine();
+															switch(Command.toCommand(resource)){
+															case copper:
+																resourceSelected = new Resource("Mineral", "Copper");
+																break;
+															case steel:
+																resourceSelected = new Resource("Alloy", "Steel");
+																break;
+															case gold:
+																resourceSelected = new Resource("Mineral", "Gold");
+																break;
+															}
+															System.out.println("Ingrese el tipo de agente: c - p - m");
+															String type = br.readLine();
+															switch(Command.toCommand(type)){
+															case c:
+																host.getSimulation().add(new Consumer(resourceSelected.name() + " consumer " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
+																break;
+															case p:
+																host.getSimulation().add(new Producer(resourceSelected.name() + " mine3 " + host.getNodeInformation().port(), resourceSelected, Duration.standardDays(1), 5));
+																break;
+															case m:
+																host.getSimulation().add(new Market(resourceSelected.name() + " market3 " + host.getNodeInformation().port(), resourceSelected));
+																break;
+															}
+														}
+													}
 												}
 											}catch (RemoteException e) {
-//												e.printStackTrace();
+												//												e.printStackTrace();
 											} catch (NotBoundException e) {
-//												e.printStackTrace();
+												//												e.printStackTrace();
 											} catch (NotCoordinatorException e) {
-//												e.printStackTrace();
+												//												e.printStackTrace();
 											} catch (IOException e) {
-//												e.printStackTrace();
+												//												e.printStackTrace();
 											}
 										}
 									};
@@ -212,11 +243,11 @@ public class SimulationApp implements Runnable {
 							}
 						}
 					} catch (IOException e1) {
-//						e1.printStackTrace();
+						//						e1.printStackTrace();
 					} catch (NumberFormatException e) {
-//						e.printStackTrace();
+						//						e.printStackTrace();
 					} catch (AlreadyBoundException e) {
-//						e.printStackTrace();
+						//						e.printStackTrace();
 					}
 				}
 			};
