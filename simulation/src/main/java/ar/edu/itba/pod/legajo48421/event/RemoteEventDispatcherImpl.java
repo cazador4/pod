@@ -5,6 +5,8 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.Random;
@@ -63,19 +65,21 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 						int countFalse = 0;
 						//ver cuantos false recibo del publish para no seguir mandando!
 						Set<NodeInformation> connectedNodes = cluster.connectedNodes();
-						for(NodeInformation connectedNode : connectedNodes){
-							//if(countFalse<=connectedNodes.size()/2){
-							if(!connectedNode.equals(host.getNodeInformation())){
-								//Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
-								RemoteEventDispatcher remoteEventDispatcher = host.getRemoteEventDispatcherFor(connectedNode);
-								lastTimeSendEvent.put(connectedNode, System.currentTimeMillis());
-								if(remoteEventDispatcher!=null){
-								boolean answer = remoteEventDispatcher.publish((EventInformation)eventInformation);
-								if(!answer)
-									countFalse++;
+						ArrayList<NodeInformation> connectedNodesShuffle = Collections.list(Collections.enumeration(connectedNodes));
+						Collections.shuffle(connectedNodesShuffle);
+						for(NodeInformation connectedNode : connectedNodesShuffle){
+							if(countFalse<=(connectedNodes.size()-1)/3){
+								if(!connectedNode.equals(host.getNodeInformation())){
+									//Registry connectedRegistry = LocateRegistry.getRegistry(connectedNode.host(), connectedNode.port());
+									RemoteEventDispatcher remoteEventDispatcher = host.getRemoteEventDispatcherFor(connectedNode);
+									lastTimeSendEvent.put(connectedNode, System.currentTimeMillis());
+									if(remoteEventDispatcher!=null){
+										boolean answer = remoteEventDispatcher.publish((EventInformation)eventInformation);
+										if(!answer)
+											countFalse++;
+									}
 								}
 							}
-							//}
 						}
 					} catch (RemoteException e) {
 						//e.printStackTrace();
@@ -99,20 +103,21 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 						Thread.sleep(Constant.NEW_EVENTS);
 						registry = LocateRegistry.getRegistry(host.getNodeInformation().host(), host.getNodeInformation().port());
 						ClusterAdministration cluster = (ClusterAdministration)registry.lookup(Node.CLUSTER_COMUNICATION);
-						Random random = new Random();
+//						Random random = new Random();
 						Set<NodeInformation> nodes = cluster.connectedNodes();
 						if(nodes.size()>1){
-							int position = random.nextInt(nodes.size()-1);
+//							int position = random.nextInt(nodes.size()-1);
 							//System.out.println("posicion " + position);
 							//connectedNode = (NodeInformation)nodes.toArray()[position];
 							for(NodeInformation connectedNodeFor : nodes){
 								connectedNode = connectedNodeFor;
 								if(!connectedNodeFor.equals(host.getNodeInformation())){
-									//									System.out.println("Le pido los eventos al nodo: " + connectedNodeFor.id());
 									registry = LocateRegistry.getRegistry(connectedNodeFor.host(), connectedNodeFor.port());
 									RemoteEventDispatcher connectedEventDispatcher = (RemoteEventDispatcher)registry.lookup(Node.DISTRIBUTED_EVENT_DISPATCHER);
 									Set<EventInformation> newEvents = connectedEventDispatcher.newEventsFor(host.getNodeInformation());
-									queue.addAll(newEvents);
+									synchronized(queue){
+										queue.addAll(newEvents);
+									}
 								}
 							}
 						}
@@ -164,10 +169,11 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 		getLock().readLock().lock();
 		synchronized(queue){
 			if(!queue.contains(event) && !processingEvents.containsKey(event)){
-				queue.add(event);
 				result = true;
+				queue.add(event);
 			}
 		}
+
 		getLock().readLock().unlock();
 		return result;
 	}

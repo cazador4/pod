@@ -10,7 +10,6 @@ import ar.edu.itba.pod.agent.runner.Environment;
 public class Consumer extends ResourceAgent {
 	private Duration rate;
 	private int amount;
-	
 	private int stock;
 
 	public Consumer(String name, Resource resource, Duration rate, int amount) {
@@ -26,6 +25,7 @@ public class Consumer extends ResourceAgent {
 	
 	@Override
 	public void execute(Environment env) {
+		long antes = System.currentTimeMillis();
 		env.wait(rate);
 		env.publish(new Requires(name(), resource(), amount));
 		log("buying %d units of %s", amount, resource());
@@ -38,6 +38,7 @@ public class Consumer extends ResourceAgent {
 			}
 		}
 		stock=0;
+		System.out.println("Tiempo promedio de ejecucion: " + (System.currentTimeMillis()-antes));
 	}
 
 	/** @see ar.edu.itba.pod.agent.runner.Agent#state()*/

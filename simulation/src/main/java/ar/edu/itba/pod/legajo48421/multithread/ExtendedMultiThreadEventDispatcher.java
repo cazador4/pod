@@ -9,17 +9,19 @@ import ar.edu.itba.pod.legajo48421.node.api.Host;
 import ar.edu.itba.pod.multithread.MultiThreadEventDispatcher;
 
 public class ExtendedMultiThreadEventDispatcher extends MultiThreadEventDispatcher{
-	
+
 	private Host host;
-	
+
 	public ExtendedMultiThreadEventDispatcher(Host host){
 		this.host = host;
 	}
-	
+
 	@Override
 	public void publish(Agent source, Serializable event)
 			throws InterruptedException {
-		super.publish(source, event);
+		synchronized(ExtendedMultiThreadEventDispatcher.class){
+			super.publish(source, event);
+		}
 		EventInformation eventInformation = new EventInformation(event, host.getNodeInformation().id(), source);
 		eventInformation.setReceivedTime(System.currentTimeMillis());
 		try {
@@ -28,9 +30,11 @@ public class ExtendedMultiThreadEventDispatcher extends MultiThreadEventDispatch
 			e.printStackTrace();
 		}
 	}
-	
+
 	public void publishIntern(Agent source, Serializable event) throws InterruptedException{
-		super.publish(source, event);
+		synchronized(ExtendedMultiThreadEventDispatcher.class){
+			super.publish(source, event);
+		}
 	}
 
 }

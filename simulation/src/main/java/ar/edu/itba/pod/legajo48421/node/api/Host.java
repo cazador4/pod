@@ -55,7 +55,7 @@ public class Host {
 		extendedMultiThreadEventDispatcher = new ExtendedMultiThreadEventDispatcher(this);
 		agentsTransfer = new AgentsTransferImpl(this);
 		statisticsReports = new StatisticsReportsImpl(this);
-		simulation = new ClusterSimulation(TimeMappers.oneSecondEach(Duration.standardHours(6)), this);
+		simulation = new ClusterSimulation(TimeMappers.oneSecondEach(Duration.standardHours(50)), this);
 		
 		registry.bind(Node.CLUSTER_COMUNICATION, cluster);
 		registry.bind(Node.DISTRIBUTED_EVENT_DISPATCHER, remoteEventDispatcher);
@@ -334,6 +334,11 @@ public class Host {
 		}
 		System.out.println("Apunto de cerrar...");
 		balancer.shutdown(nodeAgentsToMove);
+		registry.unbind(Node.CLUSTER_COMUNICATION);
+		registry.unbind(Node.DISTRIBUTED_EVENT_DISPATCHER);
+		registry.unbind(Node.AGENTS_BALANCER);
+		registry.unbind(Node.AGENTS_TRANSFER);
+		registry.unbind(Node.STATISTIC_REPORTS);
 		System.exit(0);
 	}
 }

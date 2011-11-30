@@ -37,6 +37,7 @@ public class AgentsTransferImpl implements AgentsTransfer{
 		Set <EventInformation> events = new HashSet<EventInformation>();
 		Preconditions.checkNotNull(agents, "Agents can not be null");
 		for(NodeAgent agent : agents){
+			events.clear();
 			if(!host.getNodeInformation().equals(agent.node())){
 				RemoteEventDispatcher remoteEventDispatcher = host.getRemoteEventDispatcherFor(agent.node());
 				if(remoteEventDispatcher!=null)
@@ -72,9 +73,8 @@ public class AgentsTransferImpl implements AgentsTransfer{
 			List<NodeAgent> result = new ArrayList<NodeAgent>();
 			List<Agent> agentsRunning = host.getSimulation().getAgentsRunning();
 			for(int i=0; i<numberOfAgents; i++){
+				result.add(new NodeAgent(host.getNodeInformation(), agentsRunning.get(i)));
 				host.getSimulation().remove(agentsRunning.get(i));
-				NodeAgent nodeAgent = new NodeAgent(host.getNodeInformation(), agentsRunning.get(i));
-				result.add(nodeAgent);
 			}
 			return result;
 		}
