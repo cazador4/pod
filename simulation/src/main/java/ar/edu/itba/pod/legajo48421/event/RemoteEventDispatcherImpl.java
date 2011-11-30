@@ -73,9 +73,13 @@ public class RemoteEventDispatcherImpl implements RemoteEventDispatcher {
 									RemoteEventDispatcher remoteEventDispatcher = host.getRemoteEventDispatcherFor(connectedNode);
 									lastTimeSendEvent.put(connectedNode, System.currentTimeMillis());
 									if(remoteEventDispatcher!=null){
-										boolean answer = remoteEventDispatcher.publish((EventInformation)eventInformation);
-										if(!answer)
-											countFalse++;
+										try{
+											boolean answer = remoteEventDispatcher.publish((EventInformation)eventInformation);
+											if(!answer)
+												countFalse++;
+										}catch(Exception e){
+											//SI JUSTO SE DESCONECTO EL NODO AL QUE LE IBA A PUBLICAR EVENTOS
+										}
 									}
 								}
 							}
